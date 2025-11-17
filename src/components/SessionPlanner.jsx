@@ -783,20 +783,24 @@ export default function SessionPlanner({ onStartSession }) {
               </div>
 
               <div className="flex gap-2 overflow-x-auto pb-2">
-                {categories.map((category) => (
-                  <motion.button
-                    key={category}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setFilter(category)}
-                    className={`px-4 py-2 text-xs font-medium whitespace-nowrap transition-all border ${
-                      filter === category
-                        ? 'bg-mono-900 text-white border-mono-900'
-                        : 'bg-white text-mono-600 border-mono-300 hover:border-mono-900'
-                    }`}
-                  >
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </motion.button>
-                ))}
+                {categories.map((category) => {
+                  const categoryColor = category === 'all' ? '#6B7280' : getMuscleColor(category)
+                  return (
+                    <motion.button
+                      key={category}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setFilter(category)}
+                      className={`px-4 py-2 text-xs font-medium whitespace-nowrap transition-all border border-l-4 ${
+                        filter === category
+                          ? 'bg-mono-900 text-white border-mono-900'
+                          : 'bg-white text-mono-600 border-mono-300 hover:border-mono-900'
+                      }`}
+                      style={{ borderLeftColor: categoryColor }}
+                    >
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </motion.button>
+                  )
+                })}
               </div>
             </div>
 

@@ -1,0 +1,32 @@
+[
+  {
+    "iteration": 6,
+    "prompt": "Fitness app icon. Simple silhouette of human body, front view, standing. Chest and shoulder muscles highlighted in solid bright red. Rest of body in light gray. Pure white background. Flat design, minimal style. No details, no face, no equipment.",
+    "local_path": "media_output/iteration_6_v2_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_6_v2_chest_front.png"
+  },
+  {
+    "iteration": 7,
+    "prompt": "Vector graphic for workout app. Front view body silhouette. Red fill on: chest area, front shoulders, upper arms. Gray fill on rest of body. White background. Simple shapes, no gradients. Like app store fitness icons.",
+    "local_path": "media_output/iteration_7_v2_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_7_v2_chest_front.png"
+  },
+  {
+    "iteration": 8,
+    "prompt": "Muscle heat map graphic. Simple standing figure, front view. Bright red overlay on chest, shoulders, arms. Light gray body outline. White clean background. Fitness tracker style visualization. Minimalist, bold colors only.",
+    "local_path": "media_output/iteration_8_v2_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_8_v2_chest_front.png"
+  },
+  {
+    "iteration": 9,
+    "prompt": "Fitness app muscle diagram. Basic human body shape, front facing. Color blocks: RED (chest, front shoulders, triceps area), GRAY (everything else). White background. Simple geometric style like Apple Health app.",
+    "local_path": "media_output/iteration_9_v2_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_9_v2_chest_front.png"
+  },
+  {
+    "iteration": 10,
+    "prompt": "Workout app muscle icon. Front body outline, minimal detail. Solid red: pecs, deltoids, triceps. Solid light gray: other muscles. White background. Ultra simple, instantly readable at small sizes. No text, no labels, no face detail.",
+    "local_path": "media_output/iteration_10_v2_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_10_v2_chest_front.png"
+  }
+]

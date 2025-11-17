@@ -46,69 +46,60 @@ export default function ExerciseCard({ exercise, onAdd, onDelete, showDelete = f
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="card-flat p-4 hover:border-mono-400 transition-colors border-l-8"
+      onClick={() => setShowDetail(true)}
+      className="card-flat p-2.5 hover:border-mono-400 transition-colors border-l-8 cursor-pointer relative"
       style={{ borderLeftColor: muscleColor }}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3 border-b border-mono-100 pb-2">
-        <div>
-          <h3 className={headingStyles.h4}>{exercise.name}</h3>
-          <p
-            className={`${headingStyles.label} border-b-4 inline-block pb-0.5`}
-            style={{ borderBottomColor: muscleColor }}
-          >
-            {config.label}
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="text-xs text-mono-500 border border-mono-200 px-2 py-0.5">
-            {config.code}
-          </div>
+      {/* Header with exercise name */}
+      <div className="mb-2">
+        <h3 className={`${headingStyles.h4} mb-1`}>{exercise.name}</h3>
+        {/* Full-width horizontal color bar */}
+        <div
+          className="w-full h-1"
+          style={{ backgroundColor: muscleColor }}
+        />
+      </div>
+
+      {/* Category label */}
+      <div className="mb-2">
+        <p className={`${headingStyles.label} text-mono-600`}>
+          {config.label}
+        </p>
+      </div>
+
+      {/* Action buttons in top-right corner */}
+      <div className="absolute top-2 right-2 flex gap-1">
+        {/* Add button - small and subtle */}
+        {onAdd && (
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={(e) => {
               e.stopPropagation()
-              setShowDetail(true)
+              onAdd(exercise)
             }}
-            className="text-mono-500 hover:text-mono-900 p-1 transition-colors"
-          >
-            <Info className="w-3.5 h-3.5" strokeWidth={2} />
-          </motion.button>
-        </div>
-      </div>
-
-      {/* Category */}
-      <div className="mb-3">
-        <div className={`${headingStyles.label} mb-1`}>CATEGORY</div>
-        <div className={headingStyles.body}>{exercise.category}</div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-2 border-t border-mono-100 pt-3">
-        {onAdd && (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onAdd(exercise)}
-            className="flex-1 bg-mono-900 hover:bg-mono-800 text-white py-2 px-3 text-xs font-medium
-                     flex items-center justify-center gap-2 transition-colors"
+            className="p-1.5 bg-mono-100 hover:bg-mono-200 text-mono-700 hover:text-mono-900
+                       transition-colors rounded text-xs"
+            title="Add to workout"
           >
             <Plus size={14} strokeWidth={2} />
-            ADD
           </motion.button>
         )}
 
+        {/* Delete button - only shown when showDelete is true */}
         {showDelete && onDelete && (
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onDelete(exercise.id)}
-            className="flex-1 bg-mono-200 hover:bg-mono-300 text-mono-900 py-2 px-3 text-xs font-medium
-                     flex items-center justify-center gap-2 transition-colors"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(exercise.id)
+            }}
+            className="p-1.5 bg-mono-200 hover:bg-mono-300 text-mono-900
+                       transition-colors rounded"
+            title="Remove from workout"
           >
             <Trash2 size={14} strokeWidth={2} />
-            REMOVE
           </motion.button>
         )}
       </div>
@@ -118,6 +109,7 @@ export default function ExerciseCard({ exercise, onAdd, onDelete, showDelete = f
         exercise={exercise}
         isOpen={showDetail}
         onClose={() => setShowDetail(false)}
+        onAdd={onAdd}
       />
     </motion.div>
   )

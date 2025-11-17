@@ -1,9 +1,16 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Dumbbell, Zap, Target, Award } from 'lucide-react'
+import { X, Dumbbell, Zap, Target, Award, Plus } from 'lucide-react'
 import { slideUp, modalBackdrop } from '../utils/animations'
 
-export default function ExerciseDetailModal({ exercise, isOpen, onClose }) {
+export default function ExerciseDetailModal({ exercise, isOpen, onClose, onAdd }) {
   if (!exercise) return null
+
+  const handleAddExercise = () => {
+    if (onAdd) {
+      onAdd(exercise)
+      onClose()
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -58,6 +65,23 @@ export default function ExerciseDetailModal({ exercise, isOpen, onClose }) {
                 </div>
               )}
             </div>
+
+            {/* Prominent ADD TO WORKOUT CTA */}
+            {onAdd && (
+              <div className="px-6 pt-4 pb-2">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleAddExercise}
+                  className="w-full bg-mono-900 hover:bg-mono-800 text-white py-4 px-6 text-base font-bold
+                             flex items-center justify-center gap-3 transition-colors uppercase tracking-wide
+                             shadow-lg"
+                >
+                  <Plus size={24} strokeWidth={2.5} />
+                  Add to Workout
+                </motion.button>
+              </div>
+            )}
 
             {/* Content */}
             <div className="p-6 space-y-6">

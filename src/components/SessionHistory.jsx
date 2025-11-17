@@ -390,7 +390,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                       <SessionTimeline session={session} />
 
                       {/* Exercise Details */}
-                      <div className="space-y-3">
+                      <div className="space-y-6">
                         {session.exercises.map((exercise, index) => {
                           const exerciseStats = exercise.sets
                             ? {
@@ -410,10 +410,10 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                               initial={{ opacity: 0, x: -20 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: index * 0.1 }}
-                              className="bg-white border border-mono-200 overflow-hidden"
+                              className="bg-white border-2 border-mono-300 overflow-hidden shadow-md"
                             >
                               <div
-                                className="h-1"
+                                className="h-2"
                                 style={{ backgroundColor: getMuscleColor(exercise.muscleGroup) }}
                               />
                               <div className="p-4">

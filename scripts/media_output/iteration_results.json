@@ -1,0 +1,32 @@
+[
+  {
+    "iteration": 1,
+    "prompt": "Fitness app muscle diagram for Barbell Bench Press. Simple, clean illustration showing front view of human torso. Highlight Pectoralis Major, Anterior Deltoids, Triceps Brachii, Serratus Anterior in BRIGHT RED. Other muscles in light gray. White background. Icon-style graphic, minimal detail. For exercise tracking app UI. No text, no labels.",
+    "local_path": "media_output/iteration_1_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_1_chest_front.png"
+  },
+  {
+    "iteration": 2,
+    "prompt": "Exercise muscle group visualization for fitness app. Front view showing which muscles are worked during Barbell Bench Press. Highlighted muscles: Pectoralis Major, Anterior Deltoids, Triceps Brachii, Serratus Anterior in vibrant red. Clean white background. Simplified anatomy, clear and easy to understand at small sizes. Fitness tracker UI style.",
+    "local_path": "media_output/iteration_2_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_2_chest_front.png"
+  },
+  {
+    "iteration": 3,
+    "prompt": "Muscle activation map for Barbell Bench Press. Front anatomical view with Pectoralis Major, Anterior Deltoids, Triceps Brachii, Serratus Anterior highlighted in bright red/orange gradient. Simple silhouette style on white. Designed for mobile fitness app. Clear, bold, easy to read. Focus on visual clarity over anatomical accuracy.",
+    "local_path": "media_output/iteration_3_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_3_chest_front.png"
+  },
+  {
+    "iteration": 4,
+    "prompt": "Exercise guide muscle illustration. Show front view of human body with Pectoralis Major, Anterior Deltoids, Triceps Brachii, Serratus Anterior prominently highlighted in red. White clean background. Style: modern fitness app graphics (like MyFitnessPal, Fitbod). Simple, bold colors. Minimalist anatomy. For Barbell Bench Press.",
+    "local_path": "media_output/iteration_4_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_4_chest_front.png"
+  },
+  {
+    "iteration": 5,
+    "prompt": "Workout training app muscle diagram. Front body view showing muscles worked: Pectoralis Major, Anterior Deltoids, Triceps Brachii, Serratus Anterior. Bright red highlights on simplified body figure. White background. Bold, clean, app-icon quality. Instantly recognizable muscle groups. For Barbell Bench Press exercise card.",
+    "local_path": "media_output/iteration_5_chest_front.png",
+    "s3_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/iterations/iteration_5_chest_front.png"
+  }
+]

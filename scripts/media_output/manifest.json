@@ -1,0 +1,32 @@
+[
+  {
+    "exercise_id": "chest-1",
+    "name": "Barbell Bench Press",
+    "video_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/videos/chest-1_demo.mp4",
+    "anatomical_images": {
+      "front": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/chest-1_anatomy_front.png",
+      "back": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/chest-1_anatomy_back.png",
+      "side": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/chest-1_anatomy_side.png"
+    }
+  },
+  {
+    "exercise_id": "back-1",
+    "name": "Deadlift",
+    "video_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/videos/back-1_demo.mp4",
+    "anatomical_images": {
+      "front": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/back-1_anatomy_front.png",
+      "back": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/back-1_anatomy_back.png",
+      "side": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/back-1_anatomy_side.png"
+    }
+  },
+  {
+    "exercise_id": "legs-1",
+    "name": "Barbell Squat",
+    "video_url": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/videos/legs-1_demo.mp4",
+    "anatomical_images": {
+      "front": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/legs-1_anatomy_front.png",
+      "back": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/legs-1_anatomy_back.png",
+      "side": "https://thegradual-exercise-media.s3.us-east-2.amazonaws.com/images/legs-1_anatomy_side.png"
+    }
+  }
+]

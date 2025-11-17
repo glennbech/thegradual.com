@@ -41,11 +41,6 @@ export default function ExerciseLogger({
   const [previousSessionData, setPreviousSessionData] = useState(null);
   const [comparison, setComparison] = useState(null);
 
-  // Rest Timer State
-  const [restTime, setRestTime] = useState(90);
-  const [isResting, setIsResting] = useState(false);
-  const [lastSetTime, setLastSetTime] = useState(null);
-
   // Session Tracking
   const [sessionStartTime] = useState(Date.now());
   const [sessionTime, setSessionTime] = useState(0);
@@ -264,7 +259,6 @@ export default function ExerciseLogger({
       ...set,
       completed: isNowCompleted,
       completedAt: isNowCompleted ? new Date().toISOString() : null,
-      restDuration: isNowCompleted && lastSetTime ? Math.floor((Date.now() - lastSetTime) / 1000) : null
     };
 
     const updatedExercises = [...activeSession.exercises];
@@ -276,8 +270,6 @@ export default function ExerciseLogger({
     // Celebrate when completing a set
     if (isNowCompleted) {
       celebrateSet();
-      setLastSetTime(Date.now());
-      setIsResting(true);
 
       // Check if all sets are now complete
       const allSetsComplete = updatedSets.every(s => s.completed !== false);
@@ -299,20 +291,13 @@ export default function ExerciseLogger({
       });
   };
 
-  const handleAddSet = () => {
+  const handleAddSet = (setData = null) => {
     if (!currentExercise) return;
 
-    // Calculate rest duration from previous set
-    let restDuration = null;
-    if (lastSetTime) {
-      restDuration = Math.floor((Date.now() - lastSetTime) / 1000);
-    }
-
-    const newSet = {
+    const newSet = setData || {
       reps: currentSet.reps,
       weight: currentSet.weight,
       completedAt: new Date().toISOString(),
-      restDuration,
       setType,
       completed: true, // Manually added sets are immediately completed
     };
@@ -325,16 +310,12 @@ export default function ExerciseLogger({
     });
 
     setSets([...sets, newSet]);
-    setLastSetTime(Date.now());
 
     // Celebrate the added set!
     celebrateSet();
 
     // Reset set type to 'working' for next set
     setSetType('working');
-
-    // Auto-start rest timer
-    setIsResting(true);
   };
 
 
@@ -470,14 +451,6 @@ export default function ExerciseLogger({
     }
   };
 
-  const handleRestComplete = () => {
-    setIsResting(false);
-  };
-
-  const handleRestSkip = () => {
-    setIsResting(false);
-  };
-
   if (!currentExercise) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -580,30 +553,6 @@ export default function ExerciseLogger({
         </div>
       </div>
 
-      {/* Rest Timer - PROMINENT when active */}
-      {isResting && (
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-mono-900 text-white border-2 border-mono-900 p-6"
-        >
-          <div className="text-center">
-            <p className={`${headingStyles.label} text-mono-400 mb-2`}>
-              Rest Time
-            </p>
-            <p className="text-7xl font-black tabular-nums mb-4">
-              {formatDuration(restTime - (Math.floor((Date.now() - lastSetTime) / 1000)))}
-            </p>
-            <motion.button
-              onClick={handleRestSkip}
-              className="px-6 py-3 bg-white text-mono-900 font-bold uppercase tracking-wide"
-              whileTap={{ scale: 0.95 }}
-            >
-              Skip Rest
-            </motion.button>
-          </div>
-        </motion.div>
-      )}
 
       {/* Previous Session - Compact Banner */}
       {previousSessionData && previousSessionData.sets && previousSessionData.sets.length > 0 && (
@@ -627,15 +576,65 @@ export default function ExerciseLogger({
         </div>
       )}
 
-      {/* Completed Sets List */}
-      {sets.length > 0 && (
-        <div className="space-y-3">
-          <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
-            Sets ({sets.filter(s => s.completed !== false).length}/{sets.length})
-          </h3>
+      {/* Sets List */}
+      <div className="space-y-3">
+        {/* Show placeholder sets if none exist */}
+        {sets.length === 0 ? (
+          <>
+            <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
+              Sets (0/3)
+            </h3>
+            <div className="space-y-2">
+              {[1, 2, 3].map((setNum) => (
+                <motion.div
+                  key={setNum}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white border-2 border-mono-200"
+                >
+                  <div className="flex items-center gap-4 py-4 px-4">
+                    {/* Checkbox - uncompleted placeholder */}
+                    <motion.button
+                      onClick={() => {
+                        // Add this set when clicked
+                        const newSet = {
+                          reps: 10,
+                          weight: 20,
+                          completed: true,
+                          setType: 'working',
+                          completedAt: new Date().toISOString()
+                        };
+                        handleAddSet(newSet);
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-10 h-10 flex-shrink-0 border-2 border-mono-900 bg-white hover:border-cyan-500
+                                 flex items-center justify-center transition-colors"
+                      type="button"
+                    >
+                      <span className="text-mono-400 text-sm font-bold">{setNum}</span>
+                    </motion.button>
 
-          <div className="space-y-2">
-            {sets.map((set, index) => (
+                    {/* Set details - editable */}
+                    <div className="flex-1">
+                      <p className="text-lg font-black text-mono-400 mb-0.5">
+                        10 reps × 20kg
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-mono-400">
+                        <span className="font-semibold">200kg</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
+              Sets ({sets.filter(s => s.completed !== false).length}/{sets.length})
+            </h3>
+            <div className="space-y-2">
+              {sets.map((set, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: -10 }}
@@ -779,9 +778,10 @@ export default function ExerciseLogger({
                 )}
               </motion.div>
             ))}
-          </div>
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Add Another Set - Collapsible Form */}
       <div className="bg-white border-2 border-mono-200">
@@ -853,40 +853,10 @@ export default function ExerciseLogger({
                 </div>
               </div>
 
-              {/* LOG SET Button - Normal size */}
-              <motion.button
-                onClick={() => {
-                  handleAddSet();
-                  setShowAddSetForm(false); // Close form after adding
-                }}
-                className="w-full h-14 bg-mono-900 text-white font-bold uppercase tracking-wide text-base flex items-center justify-center gap-2"
-                whileTap={{ scale: 0.98 }}
-              >
-                Log Set {sets.length + 1}
-              </motion.button>
-
-              {/* Rest Time Selector */}
-              <div className="pt-3 border-t border-mono-200">
-                <p className="text-xs font-medium uppercase tracking-widest text-mono-500 mb-2 text-center">
-                  Rest: {restTime}s
-                </p>
-                <div className="flex gap-2 justify-center">
-                  {[60, 90, 120, 180].map((time) => (
-                    <motion.button
-                      key={time}
-                      onClick={() => setRestTime(time)}
-                      className={`w-14 h-9 text-xs font-bold border-2 ${
-                        restTime === time
-                          ? 'bg-mono-900 text-white border-mono-900'
-                          : 'bg-white text-mono-600 border-mono-200'
-                      }`}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {time}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
+              {/* Note: User now clicks checkbox to complete set */}
+              <p className="text-xs text-mono-500 text-center">
+                Click checkbox on set to mark complete
+              </p>
             </div>
           </motion.div>
         )}
