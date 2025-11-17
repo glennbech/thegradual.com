@@ -1,0 +1,151 @@
+{
+  "uuid": "user-12345-test",
+  "sessions": [
+    {
+      "id": "session-20241115-001",
+      "startTime": "2024-11-15T08:00:00Z",
+      "endTime": "2024-11-15T09:15:00Z",
+      "templateId": "push-day",
+      "completed": true,
+      "exercises": [
+        {
+          "id": "chest-1",
+          "name": "Barbell Bench Press",
+          "category": "Chest",
+          "sets": [
+            { "reps": 8, "weight": 60, "setType": "warmup" },
+            { "reps": 10, "weight": 80, "setType": "working" },
+            { "reps": 8, "weight": 85, "setType": "working" },
+            { "reps": 6, "weight": 90, "setType": "working" }
+          ]
+        },
+        {
+          "id": "chest-2",
+          "name": "Incline Dumbbell Press",
+          "category": "Chest",
+          "sets": [
+            { "reps": 10, "weight": 30, "setType": "working" },
+            { "reps": 10, "weight": 30, "setType": "working" },
+            { "reps": 8, "weight": 32.5, "setType": "working" }
+          ]
+        },
+        {
+          "id": "shoulders-1",
+          "name": "Overhead Press",
+          "category": "Shoulders",
+          "sets": [
+            { "reps": 10, "weight": 40, "setType": "working" },
+            { "reps": 8, "weight": 45, "setType": "working" },
+            { "reps": 6, "weight": 50, "setType": "working" }
+          ]
+        },
+        {
+          "id": "arms-1",
+          "name": "Tricep Pushdowns",
+          "category": "Arms",
+          "sets": [
+            { "reps": 12, "weight": 25, "setType": "working" },
+            { "reps": 12, "weight": 25, "setType": "working" },
+            { "reps": 10, "weight": 27.5, "setType": "working" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "session-20241113-001",
+      "startTime": "2024-11-13T17:30:00Z",
+      "endTime": "2024-11-13T18:45:00Z",
+      "templateId": "pull-day",
+      "completed": true,
+      "exercises": [
+        {
+          "id": "back-1",
+          "name": "Deadlift",
+          "category": "Back",
+          "sets": [
+            { "reps": 5, "weight": 100, "setType": "working" },
+            { "reps": 5, "weight": 110, "setType": "working" },
+            { "reps": 3, "weight": 120, "setType": "working" }
+          ]
+        },
+        {
+          "id": "back-2",
+          "name": "Pull-ups",
+          "category": "Back",
+          "sets": [
+            { "reps": 8, "weight": 0, "setType": "working" },
+            { "reps": 7, "weight": 0, "setType": "working" },
+            { "reps": 6, "weight": 0, "setType": "working" }
+          ]
+        },
+        {
+          "id": "back-3",
+          "name": "Barbell Rows",
+          "category": "Back",
+          "sets": [
+            { "reps": 10, "weight": 60, "setType": "working" },
+            { "reps": 10, "weight": 65, "setType": "working" },
+            { "reps": 8, "weight": 70, "setType": "working" }
+          ]
+        },
+        {
+          "id": "arms-2",
+          "name": "Barbell Curls",
+          "category": "Arms",
+          "sets": [
+            { "reps": 10, "weight": 30, "setType": "working" },
+            { "reps": 10, "weight": 30, "setType": "working" },
+            { "reps": 8, "weight": 32.5, "setType": "working" }
+          ]
+        }
+      ]
+    }
+  ],
+  "customExercises": [
+    {
+      "id": "custom-1731689000000",
+      "name": "Cable Flyes (High to Low)",
+      "category": "Chest",
+      "muscleGroup": "chest",
+      "description": "Set cables to high position. Pull down and across body in a hugging motion. Focus on squeezing chest at peak contraction.",
+      "isCustom": true
+    }
+  ],
+  "customTemplates": [
+    {
+      "id": "custom-template-1731689100000",
+      "name": "My Custom Push Day",
+      "description": "Modified push workout with additional cable work",
+      "duration": "75-90 min",
+      "frequency": "2x per week",
+      "difficulty": "intermediate",
+      "isCustom": true,
+      "basedOn": "push-day",
+      "exerciseIds": [
+        "chest-1",
+        "chest-2",
+        "custom-1731689000000",
+        "shoulders-1",
+        "arms-1"
+      ]
+    }
+  ],
+  "activeSession": {
+    "id": "session-20241115-002",
+    "startTime": "2024-11-15T19:00:00Z",
+    "templateId": "leg-day",
+    "completed": false,
+    "exercises": [
+      {
+        "id": "legs-1",
+        "name": "Barbell Squat",
+        "category": "Legs",
+        "sets": [
+          { "reps": 10, "weight": 80, "setType": "warmup" },
+          { "reps": 8, "weight": 100, "setType": "working" }
+        ]
+      }
+    ]
+  },
+  "lastUpdated": "2024-11-15T19:05:00Z"
+}

@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Prevent zoom on double-tap */
+    touch-action: manipulation;
+    /* Prevent overscroll */
+    overscroll-behavior: none;
+    height: 100%;
+  }
+
+  body {
+    @apply bg-mono-50 text-mono-900 antialiased;
+    /* Prevent elastic scrolling / rubber-banding on mobile */
+    overscroll-behavior: none;
+    /* Prevent ALL touch gestures except taps */
+    touch-action: manipulation;
+    /* Disable text selection on mobile for app-like feel */
+    -webkit-user-select: none;
+    user-select: none;
+    /* Prevent long-press context menu on iOS */
+    -webkit-touch-callout: none;
+    /* Prevent dragging/dropping */
+    -webkit-user-drag: none;
+    /* Full height for proper sticky context */
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Body doesn't scroll, #root does */
+  }
+
+  #root {
+    /* Root is the scrolling container (required for sticky positioning) */
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Disable dragging on all elements */
+  * {
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Allow text selection in input fields */
+  input, textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Prevent confetti canvas from blocking touch events */
+  canvas {
+    pointer-events: none !important;
+  }
+
+  /* Prevent image dragging */
+  img {
+    -webkit-user-drag: none;
+    user-drag: none;
+    pointer-events: none;
+  }
+
+  /* Re-enable pointer events for interactive elements */
+  button, a, input, textarea, select {
+    pointer-events: auto;
+  }
+}
+
+@layer utilities {
+  .card-flat {
+    @apply bg-white border border-mono-200;
+  }
+}
