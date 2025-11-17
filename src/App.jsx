@@ -151,7 +151,7 @@ function App() {
   }
 
   const navItems = [
-    { id: 'home', label: 'Plan', icon: Plus },
+    { id: 'home', label: 'Work Out', icon: Plus },
     { id: 'history', label: 'History', icon: Calendar },
     { id: 'progress', label: 'Progress', icon: TrendingUp },
     { id: 'health', label: 'Health', icon: Activity }, // All the way to the right

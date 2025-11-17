@@ -10,7 +10,6 @@ import {
   Save,
   X,
   Info,
-  Edit2,
   Check,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -20,6 +19,7 @@ import { headingStyles, iconSizes } from '../utils/typography';
 import { ComparisonRow } from './ComparisonBadge';
 import { getMuscleColor, formatDuration, colors, comparePerformance } from '../utils/design-system';
 import ConfirmDialog from './ConfirmDialog';
+import ExerciseDetailModal from './ExerciseDetailModal';
 
 export default function ExerciseLogger({
   exercises,
@@ -48,6 +48,9 @@ export default function ExerciseLogger({
 
   // Add Set Form - Collapsed by default
   const [showAddSetForm, setShowAddSetForm] = useState(false);
+
+  // Exercise info modal
+  const [showExerciseDetail, setShowExerciseDetail] = useState(false);
 
   // Confirmation dialogs
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
@@ -177,12 +180,22 @@ export default function ExerciseLogger({
               plannedFromPrevious: true,
             })) || [];
 
+            // If no previous session data, create default planned sets
+            const defaultPlannedSets = [
+              { reps: 10, weight: 20, completed: false, setType: 'working' },
+              { reps: 10, weight: 20, completed: false, setType: 'working' },
+              { reps: 10, weight: 20, completed: false, setType: 'working' },
+            ];
+
+            const initialSets = prePopulatedSets.length > 0 ? prePopulatedSets : defaultPlannedSets;
+
             console.log('  - Pre-populated sets:', prePopulatedSets.length, 'sets');
-            console.log('  - Sets detail:', prePopulatedSets);
+            console.log('  - Initial sets (with fallback):', initialSets.length, 'sets');
+            console.log('  - Sets detail:', initialSets);
 
             return {
               ...ex,
-              sets: prePopulatedSets,
+              sets: initialSets,
             };
           }),
           startTime: Date.now(),
@@ -488,7 +501,7 @@ export default function ExerciseLogger({
 
       <div className="space-y-4 pb-32">
       {/* Simplified Top Bar: Just session progress */}
-      <div className="sticky top-0 z-20 bg-white border-b border-mono-200 -mx-4 px-4 py-2">
+      <div className="bg-white border-b border-mono-200 -mx-4 px-4 py-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-mono-500 uppercase tracking-wide">
             {formatDuration(sessionTime)} • {totalSetsCompleted} sets
@@ -506,12 +519,19 @@ export default function ExerciseLogger({
       {/* Exercise Navigation Bar - Cleaner */}
       <div className="bg-white border-2 border-mono-900">
         <div className="flex items-center gap-3 p-4">
-          {/* Exercise Name - Prominent */}
-          <div className="flex-1">
-            <p className={`${headingStyles.label} mb-1 tabular-nums`}>
-              Exercise {currentExerciseIndex + 1} / {activeSession.exercises.length}
+          {/* Exercise Name - Prominent & Clickable */}
+          <div
+            className="flex-1 cursor-pointer hover:bg-mono-50 -m-2 p-2 rounded transition-colors"
+            onClick={() => setShowExerciseDetail(true)}
+          >
+            <p className={`${headingStyles.label} mb-1 tabular-nums flex items-center gap-2`}>
+              <span>Exercise {currentExerciseIndex + 1} / {activeSession.exercises.length}</span>
+              <Info className="w-3 h-3 text-mono-500" />
             </p>
-            <h2 className={headingStyles.h1}>
+            <h2
+              className={headingStyles.h1}
+              style={{ color: getMuscleColor(currentExercise.category) }}
+            >
               {currentExercise.name}
             </h2>
             <p className={`${headingStyles.label} mt-1`}>
@@ -578,63 +598,11 @@ export default function ExerciseLogger({
 
       {/* Sets List */}
       <div className="space-y-3">
-        {/* Show placeholder sets if none exist */}
-        {sets.length === 0 ? (
-          <>
-            <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
-              Sets (0/3)
-            </h3>
-            <div className="space-y-2">
-              {[1, 2, 3].map((setNum) => (
-                <motion.div
-                  key={setNum}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white border-2 border-mono-200"
-                >
-                  <div className="flex items-center gap-4 py-4 px-4">
-                    {/* Checkbox - uncompleted placeholder */}
-                    <motion.button
-                      onClick={() => {
-                        // Add this set when clicked
-                        const newSet = {
-                          reps: 10,
-                          weight: 20,
-                          completed: true,
-                          setType: 'working',
-                          completedAt: new Date().toISOString()
-                        };
-                        handleAddSet(newSet);
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      className="w-10 h-10 flex-shrink-0 border-2 border-mono-900 bg-white hover:border-cyan-500
-                                 flex items-center justify-center transition-colors"
-                      type="button"
-                    >
-                      <span className="text-mono-400 text-sm font-bold">{setNum}</span>
-                    </motion.button>
-
-                    {/* Set details - editable */}
-                    <div className="flex-1">
-                      <p className="text-lg font-black text-mono-400 mb-0.5">
-                        10 reps × 20kg
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-mono-400">
-                        <span className="font-semibold">200kg</span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <>
-            <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
-              Sets ({sets.filter(s => s.completed !== false).length}/{sets.length})
-            </h3>
-            <div className="space-y-2">
-              {sets.map((set, index) => (
+        <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
+          Sets ({sets.filter(s => s.completed !== false).length}/{sets.length})
+        </h3>
+        <div className="space-y-2">
+          {sets.map((set, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: -10 }}
@@ -735,10 +703,20 @@ export default function ExerciseLogger({
                       )}
                     </motion.button>
 
-                    {/* Set details */}
-                    <div className="flex-1">
+                    {/* Set details - clickable when not completed */}
+                    <div
+                      className={`flex-1 ${!set.completed ? 'cursor-pointer hover:bg-mono-50 -m-2 p-2 rounded transition-colors' : ''}`}
+                      onClick={() => {
+                        if (!set.completed) {
+                          handleStartEditSet(index);
+                        }
+                      }}
+                    >
                       <p className={`text-lg font-black mb-0.5 ${set.completed ? 'text-mono-900' : 'text-mono-600'}`}>
                         {set.reps} reps × {set.weight}kg
+                        {!set.completed && (
+                          <span className="text-xs text-mono-400 ml-2">(tap to edit)</span>
+                        )}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-mono-500">
                         <span className="font-semibold">{(set.reps * set.weight).toFixed(1)}kg</span>
@@ -761,13 +739,6 @@ export default function ExerciseLogger({
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <motion.button
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => handleStartEditSet(index)}
-                        className="p-2 text-mono-400 hover:text-cyan-500"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileTap={{ scale: 0.9 }}
                         onClick={() => handleRemoveSet(index)}
                         className="p-2 text-mono-400 hover:text-red-500"
                       >
@@ -778,9 +749,7 @@ export default function ExerciseLogger({
                 )}
               </motion.div>
             ))}
-            </div>
-          </>
-        )}
+        </div>
       </div>
 
       {/* Add Another Set - Collapsible Form */}
@@ -900,6 +869,13 @@ export default function ExerciseLogger({
         </div>
       </div>
       </div>
+
+      {/* Exercise Detail Modal */}
+      <ExerciseDetailModal
+        exercise={currentExercise}
+        isOpen={showExerciseDetail}
+        onClose={() => setShowExerciseDetail(false)}
+      />
     </>
   );
 }

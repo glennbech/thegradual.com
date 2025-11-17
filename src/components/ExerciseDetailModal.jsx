@@ -5,11 +5,12 @@ import { slideUp, modalBackdrop } from '../utils/animations'
 export default function ExerciseDetailModal({ exercise, isOpen, onClose, onAdd }) {
   if (!exercise) return null
 
-  const handleAddExercise = () => {
+  const handleAddExercise = (e) => {
+    e.stopPropagation() // Prevent event bubbling
     if (onAdd) {
       onAdd(exercise)
-      onClose()
     }
+    onClose()
   }
 
   return (
@@ -26,6 +27,7 @@ export default function ExerciseDetailModal({ exercise, isOpen, onClose, onAdd }
           {/* Modal */}
           <motion.div
             {...slideUp}
+            onClick={(e) => e.stopPropagation()}
             className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-mono-900 z-50 max-h-[90vh] overflow-y-auto"
           >
             {/* Header */}
@@ -44,7 +46,10 @@ export default function ExerciseDetailModal({ exercise, isOpen, onClose, onAdd }
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={onClose}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onClose()
+                  }}
                   className="text-mono-500 hover:text-mono-900 p-2"
                 >
                   <X className="w-6 h-6" strokeWidth={2} />

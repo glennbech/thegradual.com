@@ -1,0 +1,42 @@
+{
+  "generated_at": "2025-11-17T22:38:29.859769",
+  "source": "Unsplash",
+  "bucket": "prod-web-origin-962595531541",
+  "cloudfront_domain": "dixcgxyyjlm7x.cloudfront.net",
+  "path": "media/images/",
+  "images": [
+    {
+      "filename": "hero-1-asian-woman.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-1-asian-woman.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-1-asian-woman.jpg",
+      "s3_key": "media/images/hero-1-asian-woman.jpg",
+      "description": "Asian woman in gym attire with water bottle",
+      "size_kb": 346
+    },
+    {
+      "filename": "hero-2-black-man.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-2-black-man.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-2-black-man.jpg",
+      "s3_key": "media/images/hero-2-black-man.jpg",
+      "description": "Black man in athletic wear ready to train",
+      "size_kb": 129
+    },
+    {
+      "filename": "hero-3-latina-woman.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-3-latina-woman.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-3-latina-woman.jpg",
+      "s3_key": "media/images/hero-3-latina-woman.jpg",
+      "description": "Latina woman with yoga mat in sportswear",
+      "size_kb": 149
+    },
+    {
+      "filename": "hero-4-white-man.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-4-white-man.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-4-white-man.jpg",
+      "s3_key": "media/images/hero-4-white-man.jpg",
+      "description": "White man in gym clothes with towel",
+      "size_kb": 157
+    }
+  ],
+  "license": "Unsplash License (free for commercial use with attribution)"
+}

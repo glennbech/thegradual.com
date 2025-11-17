@@ -15,10 +15,11 @@ export default function SessionPlanner({ onStartSession }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState('all')
   const [showTemplates, setShowTemplates] = useState(true)
-  const [showSuggestedWorkouts, setShowSuggestedWorkouts] = useState(false) // Collapse suggested workouts
+  const [showSuggestedWorkouts, setShowSuggestedWorkouts] = useState(true) // Keep suggested workouts open by default
+  const [showAllTemplates, setShowAllTemplates] = useState(false) // Show only 3 templates initially
   const [showQuickStart, setShowQuickStart] = useState(true) // Collapse quick start
   const [showPersonalWorkouts, setShowPersonalWorkouts] = useState(true) // Collapse personal workouts
-  const [showExerciseLibrary, setShowExerciseLibrary] = useState(false) // Collapse exercise library
+  const [showExerciseLibrary, setShowExerciseLibrary] = useState(true) // Start with exercise library expanded
   const [customTemplates, setCustomTemplates] = useState([])
   const [lastSession, setLastSession] = useState(null) // Last completed session
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
@@ -49,10 +50,7 @@ export default function SessionPlanner({ onStartSession }) {
   }, [exercises, customTemplates])
 
   // Show suggested workouts expanded when no personal content exists
-  useEffect(() => {
-    const hasNoPersonalContent = customTemplates.length === 0 && !lastSession
-    setShowSuggestedWorkouts(hasNoPersonalContent)
-  }, [customTemplates, lastSession])
+  // Removed: Auto-collapse logic - keep Suggested Workouts always expanded by default
 
   const loadExercises = async () => {
     const data = await exerciseService.getAll()
@@ -227,6 +225,27 @@ export default function SessionPlanner({ onStartSession }) {
     }
   }
 
+  const handleStartWorkoutFromTemplate = (template) => {
+    // Get exercises from template
+    const templateExercises = template.exerciseIds
+      .map(id => exercises.find(ex => ex.id === id))
+      .filter(Boolean) // Remove any undefined exercises
+
+    if (templateExercises.length > 0) {
+      // Create template reference (not modified since we're starting directly from template)
+      const templateReference = {
+        templateId: template.id,
+        templateName: template.name,
+        templateType: template.isCustom ? 'custom' : 'built-in',
+        templateVersion: template.version || 1,
+        isModified: false // Always false when starting directly from template
+      }
+
+      // Start session immediately, bypassing the edit page
+      onStartSession(templateExercises, templateReference)
+    }
+  }
+
   const handleSaveAsTemplate = () => {
     // Pre-fill with current template data if editing, otherwise use defaults
     setTemplateForm({
@@ -312,8 +331,64 @@ export default function SessionPlanner({ onStartSession }) {
 
   const categories = ['all', ...new Set(exercises.map(ex => ex.category))]
 
+  // Hero images - rotated randomly
+  const HERO_IMAGES = [
+    'https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-1-asian-woman.jpg',
+    'https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-2-black-man.jpg',
+    'https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-3-latina-woman.jpg',
+    'https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-4-white-man.jpg',
+    'https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-5-group-training.jpg',
+    'https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-6-gym-buddies.jpg'
+  ]
+
+  const [heroImage] = useState(() =>
+    HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)]
+  )
+
   return (
     <div className="space-y-6">
+      {/* Hero Section */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="relative bg-gradient-to-br from-mono-900 to-mono-800 rounded overflow-hidden h-56 md:h-72 shadow-xl"
+      >
+        {/* Hero Image Background */}
+        <div className="absolute inset-0">
+          <img
+            src={heroImage}
+            alt="Athlete ready to train"
+            className="w-full h-full object-cover opacity-30"
+          />
+        </div>
+
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-mono-900/60 via-mono-900/30 to-transparent" />
+
+        {/* Content */}
+        <div className="relative z-10 flex items-center justify-center h-full p-6 md:p-8">
+          <div className="text-center text-white space-y-2">
+            <motion.h1
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight"
+            >
+              Ready to train?
+            </motion.h1>
+            <motion.p
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-base md:text-lg text-mono-200"
+            >
+              Plan your workout and track your progress
+            </motion.p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Quick Start Section */}
       {lastSession && selectedExercises.length === 0 && (
         <motion.div
@@ -356,7 +431,7 @@ export default function SessionPlanner({ onStartSession }) {
                       .map(id => exercises.find(ex => ex.id === id))
                       .filter(Boolean)}
                     lastPerformed={new Date(lastSession.createdAt).getTime()}
-                    onStart={() => handleLoadTemplate(lastSession.template)}
+                    onStart={() => handleStartWorkoutFromTemplate(lastSession.template)}
                   />
                 </div>
               </motion.div>
@@ -444,44 +519,57 @@ export default function SessionPlanner({ onStartSession }) {
                                 onClick={() => handleLoadTemplate(template)}
                               >
                                 <div className="flex items-start justify-between mb-3 border-b border-mono-100 pb-2">
-                                  <div>
+                                  <div className="flex-1">
                                     <h4 className={headingStyles.h4}>
                                       {template.name}
                                     </h4>
                                   </div>
-                                  <div className="flex items-center gap-1">
-                                    <div className="text-xs text-mono-500 border border-mono-200 px-2 py-0.5 uppercase">
-                                      {template.difficulty[0]}
-                                    </div>
-                                    <motion.button
-                                      whileHover={{ scale: 1.05 }}
-                                      whileTap={{ scale: 0.95 }}
-                                      onClick={(e) => handleDeleteTemplate(template.id, e)}
-                                      className="text-mono-500 hover:text-mono-900 p-1"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
-                                    </motion.button>
-                                  </div>
+                                  {/* Delete button */}
+                                  <motion.button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteTemplate(template.id, e);
+                                    }}
+                                    whileTap={{ scale: 0.9 }}
+                                    className="text-mono-500 hover:text-red-600 p-1 hover:bg-red-50 transition-colors rounded"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </motion.button>
                                 </div>
 
                                 <p className="text-xs text-mono-500 mb-3 line-clamp-2">
                                   {template.description}
                                 </p>
 
-                                <div className="space-y-1.5 text-xs">
-                                  <div className="flex justify-between">
-                                    <span className="text-mono-500 uppercase">Duration</span>
+                                {/* Metadata - Compact icon row */}
+                                <div className="flex items-center gap-4 text-xs text-mono-600 mb-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5" strokeWidth={2} />
                                     <span className="font-medium text-mono-900">{template.duration}</span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-mono-500 uppercase">Frequency</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <Target className="w-3.5 h-3.5" strokeWidth={2} />
                                     <span className="font-medium text-mono-900">{template.frequency}</span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-mono-500 uppercase">Exercises</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <Dumbbell className="w-3.5 h-3.5" strokeWidth={2} />
                                     <span className="font-medium text-mono-900">{template.exerciseIds.length}</span>
                                   </div>
                                 </div>
+
+                                {/* WORK OUT! Button */}
+                                <motion.button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStartWorkoutFromTemplate(template);
+                                  }}
+                                  whileTap={{ scale: 0.98 }}
+                                  className="w-full bg-mono-900 hover:bg-mono-800 text-white py-2 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors"
+                                >
+                                  <Play className="w-4 h-4" fill="white" />
+                                  WORK OUT!
+                                </motion.button>
                               </motion.div>
                             )
                           })}
@@ -524,47 +612,71 @@ export default function SessionPlanner({ onStartSession }) {
                       variants={staggerContainer}
                       initial="initial"
                       animate="animate"
-                      className="grid gap-3 md:grid-cols-2 lg:grid-cols-3"
+                      className="space-y-3"
                     >
-                      {workoutTemplates.map((template) => {
-                return (
-                  <motion.div
-                    key={template.id}
-                    variants={staggerItem}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleLoadTemplate(template)}
-                    className="card-flat p-4 hover:border-mono-400 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between mb-3 border-b border-mono-100 pb-2">
-                      <h4 className={`${headingStyles.h4} flex-1`}>
-                        {template.name}
-                      </h4>
-                      <div className="text-xs text-mono-500 border border-mono-200 px-2 py-0.5 uppercase">
-                        {template.difficulty[0]}
+                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {(showAllTemplates ? workoutTemplates : workoutTemplates.slice(0, 3)).map((template) => {
+                  return (
+                    <motion.div
+                      key={template.id}
+                      variants={staggerItem}
+                      className="card-flat p-4 hover:border-mono-400 transition-colors cursor-pointer"
+                      onClick={() => handleLoadTemplate(template)}
+                    >
+                      <div className="flex items-start justify-between mb-3 border-b border-mono-100 pb-2">
+                        <h4 className={`${headingStyles.h4} flex-1`}>
+                          {template.name}
+                        </h4>
                       </div>
-                    </div>
 
-                    <p className="text-xs text-mono-500 mb-3 line-clamp-2">
-                      {template.description}
-                    </p>
+                      <p className="text-xs text-mono-500 mb-3 line-clamp-2">
+                        {template.description}
+                      </p>
 
-                    <div className="space-y-1.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-mono-500 uppercase">Duration</span>
-                        <span className="font-medium text-mono-900">{template.duration}</span>
+                      {/* Metadata - Compact icon row */}
+                      <div className="flex items-center gap-4 text-xs text-mono-600 mb-3">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" strokeWidth={2} />
+                          <span className="font-medium text-mono-900">{template.duration}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Target className="w-3.5 h-3.5" strokeWidth={2} />
+                          <span className="font-medium text-mono-900">{template.frequency}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Dumbbell className="w-3.5 h-3.5" strokeWidth={2} />
+                          <span className="font-medium text-mono-900">{template.exerciseIds.length}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-mono-500 uppercase">Frequency</span>
-                        <span className="font-medium text-mono-900">{template.frequency}</span>
+
+                      {/* WORK OUT! Button */}
+                      <motion.button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartWorkoutFromTemplate(template);
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full bg-mono-900 hover:bg-mono-800 text-white py-2 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Play className="w-4 h-4" fill="white" />
+                        WORK OUT!
+                      </motion.button>
+                    </motion.div>
+                  )
+                })}
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-mono-500 uppercase">Exercises</span>
-                        <span className="font-medium text-mono-900">{template.exerciseIds.length}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )
-              })}
+
+                      {/* Show More Button */}
+                      {!showAllTemplates && workoutTemplates.length > 3 && (
+                        <motion.button
+                          onClick={() => setShowAllTemplates(true)}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full py-3 bg-mono-100 hover:bg-mono-200 text-mono-900 font-bold text-sm uppercase tracking-wide transition-colors flex items-center justify-center gap-2"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                          Show {workoutTemplates.length - 3} More Templates
+                        </motion.button>
+                      )}
                     </motion.div>
                   </motion.div>
                 )}
@@ -614,61 +726,65 @@ export default function SessionPlanner({ onStartSession }) {
 
             <div className="p-4">
               {/* Action Buttons */}
-              <div className="flex gap-2 mb-4 pb-3 border-b border-mono-100">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  setSelectedExercises([])
-                  setCurrentTemplate(null)
-                  setOriginalTemplate(null)
-                  setShowTemplates(true)
-                }}
-                className="bg-mono-200 hover:bg-mono-300 text-mono-900 py-2 px-3 text-xs font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <X className="w-3.5 h-3.5" strokeWidth={2} />
-                CANCEL
-              </motion.button>
-              {hasTemplateChanged && (
+              <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-mono-100">
+                {/* PRIMARY: WORK OUT! Button */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={handleSaveAsTemplate}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex-1 bg-mono-200 hover:bg-mono-300 text-mono-900 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-2"
+                  onClick={handleStartSession}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors shadow-md"
                 >
-                  <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />
-                  SAVE
+                  <Play className="w-5 h-5" fill="white" strokeWidth={2} />
+                  WORK OUT!
                 </motion.button>
-              )}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleStartSession}
-                className="flex-1 bg-mono-900 hover:bg-mono-800 text-white py-2 text-xs font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <Play className="w-3.5 h-3.5" strokeWidth={2} />
-                START
-              </motion.button>
-            </div>
+
+                {/* SECONDARY: Save & Cancel */}
+                <div className="flex gap-2">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setSelectedExercises([])
+                      setCurrentTemplate(null)
+                      setOriginalTemplate(null)
+                      setShowTemplates(true)
+                    }}
+                    className="bg-mono-200 hover:bg-mono-300 text-mono-900 py-2 px-3 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <X className="w-3.5 h-3.5" strokeWidth={2} />
+                    CANCEL
+                  </motion.button>
+                  {hasTemplateChanged && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleSaveAsTemplate}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="flex-1 bg-mono-900 hover:bg-mono-800 text-white py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />
+                      SAVE AS TEMPLATE
+                    </motion.button>
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-2">
                 {selectedExercises.map((exercise, index) => (
                   <motion.div
                     key={exercise.id}
                     layout
-                    layoutDependency={selectedExercises.length} // Only recalculate when count changes (improves CLS)
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{
-                      layout: { duration: 0.2, ease: "easeOut" }, // Shorter & snappier (improves CLS)
+                      layout: { type: "spring", stiffness: 300, damping: 25 },
                       opacity: { duration: 0.15 },
                       y: { duration: 0.15 }
                     }}
-                    className="bg-mono-50 border border-mono-200 p-4 flex items-center gap-3 hover:border-mono-400 transition-colors relative min-h-[80px]"
+                    className="bg-mono-50 border border-mono-200 p-2 flex items-center gap-2 hover:border-mono-400 transition-colors relative"
                   >
                     {/* Color-coded vertical line */}
                     <div
@@ -676,8 +792,8 @@ export default function SessionPlanner({ onStartSession }) {
                       style={{ backgroundColor: getMuscleColor(exercise.muscleGroup) }}
                     />
 
-                    {/* Up/Down arrows for reordering */}
-                    <div className="flex flex-col gap-1 ml-2">
+                    {/* Up/Down arrows for reordering - COMPACT */}
+                    <div className="flex flex-col gap-0.5 ml-1">
                       <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={() => handleMoveExerciseUp(index)}
@@ -688,10 +804,10 @@ export default function SessionPlanner({ onStartSession }) {
                         onMouseUp={() => handleLongPressEnd(index, 'up')}
                         onMouseLeave={() => handleLongPressEnd(index, 'up')}
                         disabled={index === 0}
-                        className={`p-2 relative ${index === 0 ? 'text-mono-300 cursor-not-allowed' : 'text-mono-600 hover:text-mono-900 active:bg-mono-200'} ${longPressActive === `${index}-up` ? 'bg-cyan-100 scale-110' : ''}`}
+                        className={`p-1 relative ${index === 0 ? 'text-mono-300 cursor-not-allowed' : 'text-mono-600 hover:text-mono-900 active:bg-mono-200'} ${longPressActive === `${index}-up` ? 'bg-cyan-100 scale-110' : ''}`}
                         style={{ transition: 'all 0.2s' }}
                       >
-                        <ChevronUp className="w-6 h-6" strokeWidth={2.5} />
+                        <ChevronUp className="w-5 h-5" strokeWidth={2.5} />
                       </motion.button>
                       <motion.button
                         whileTap={{ scale: 0.9 }}
@@ -703,28 +819,31 @@ export default function SessionPlanner({ onStartSession }) {
                         onMouseUp={() => handleLongPressEnd(index, 'down')}
                         onMouseLeave={() => handleLongPressEnd(index, 'down')}
                         disabled={index === selectedExercises.length - 1}
-                        className={`p-2 relative ${index === selectedExercises.length - 1 ? 'text-mono-300 cursor-not-allowed' : 'text-mono-600 hover:text-mono-900 active:bg-mono-200'} ${longPressActive === `${index}-down` ? 'bg-cyan-100 scale-110' : ''}`}
+                        className={`p-1 relative ${index === selectedExercises.length - 1 ? 'text-mono-300 cursor-not-allowed' : 'text-mono-600 hover:text-mono-900 active:bg-mono-200'} ${longPressActive === `${index}-down` ? 'bg-cyan-100 scale-110' : ''}`}
                         style={{ transition: 'all 0.2s' }}
                       >
-                        <ChevronDown className="w-6 h-6" strokeWidth={2.5} />
+                        <ChevronDown className="w-5 h-5" strokeWidth={2.5} />
                       </motion.button>
                     </div>
 
+                    {/* Exercise Info - COMPACT */}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-mono-900 text-sm truncate">
-                        <span className="text-mono-500 text-xs mr-2">#{index + 1}</span>
+                        <span className="text-mono-500 text-xs mr-1.5">#{index + 1}</span>
                         {exercise.name}
                       </p>
                       <p className="text-xs text-mono-500 uppercase">{exercise.category}</p>
                     </div>
+
+                    {/* Delete Icon - COMPACT */}
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleRemoveExercise(exercise.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors"
+                      className="text-mono-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
                       title="Remove exercise"
                     >
-                      <X className="w-5 h-5" strokeWidth={2.5} />
+                      <X className="w-4 h-4" strokeWidth={2.5} />
                     </motion.button>
                   </motion.div>
                 ))}

@@ -12,6 +12,7 @@ import {
   Check,
   Sparkles,
   X,
+  Play,
 } from 'lucide-react';
 import { staggerContainer, staggerItem, scaleIn } from '../utils/animations';
 import { sessionService, templateService } from '../services/stateService';
@@ -215,14 +216,14 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
               {/* Session Header */}
               <div className="relative">
                 <div
-                  onClick={() => toggleExpand(session.id)}
+                  onClick={(e) => handleEditName(session, e)}
                   className="w-full p-4 text-left hover:bg-mono-50 transition-colors cursor-pointer"
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      toggleExpand(session.id);
+                      handleEditName(session, e);
                     }
                   }}
                 >
@@ -292,13 +293,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                                   {session.exercises.length} exercises
                                 </p>
                               </div>
-                              <motion.button
-                                whileTap={{ scale: 0.9 }}
-                                onClick={(e) => handleEditName(session, e)}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-mono-400 hover:text-mono-900 p-1"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </motion.button>
                             </div>
                           )}
                         </div>
@@ -333,43 +327,64 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-center gap-1 ml-3">
-                      <motion.button
-                        onClick={(e) => handleMakeTemplate(session, e)}
-                        whileTap={{ scale: 0.9 }}
-                        className="text-mono-500 hover:text-mono-900 p-2 hover:bg-mono-100 transition-colors"
-                        title="Make Workout"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                      </motion.button>
-
+                    <div className="flex flex-col items-end gap-2 ml-3">
+                      {/* Primary Action: WORK OUT! */}
                       <motion.button
                         onClick={(e) => {
                           e.stopPropagation();
                           onDoItAgain && onDoItAgain(session.exercises);
                         }}
-                        whileTap={{ scale: 0.9 }}
-                        className="text-mono-500 hover:text-mono-900 p-2 hover:bg-mono-100 transition-colors"
-                        title="Do It Again"
+                        whileTap={{ scale: 0.98 }}
+                        className="bg-mono-900 hover:bg-mono-800 text-white px-6 py-3 font-bold text-sm uppercase tracking-wide flex items-center gap-2 transition-colors"
                       >
-                        <Repeat2 className="w-4 h-4" />
+                        <Play className="w-4 h-4" fill="white" />
+                        WORK OUT!
                       </motion.button>
 
-                      <motion.button
-                        onClick={(e) => handleDeleteSession(session.id, e)}
-                        whileTap={{ scale: 0.9 }}
-                        className="text-mono-500 hover:text-red-500 p-2 hover:bg-mono-100 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
+                      {/* Secondary Actions: Inline Buttons */}
+                      <div className="flex items-center gap-1">
+                        <motion.button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMakeTemplate(session, e);
+                          }}
+                          whileTap={{ scale: 0.9 }}
+                          className="text-mono-500 hover:text-mono-900 p-2 hover:bg-mono-100 transition-colors rounded"
+                          title="Make Template"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                        </motion.button>
 
-                      <motion.div
-                        animate={{ rotate: isExpanded ? 180 : 0 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <ChevronDown className="w-5 h-5 text-mono-500" />
-                      </motion.div>
+                        <motion.button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSession(session.id, e);
+                          }}
+                          whileTap={{ scale: 0.9 }}
+                          className="text-mono-500 hover:text-red-600 p-2 hover:bg-red-50 transition-colors rounded"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </motion.button>
+
+                        {/* Expand/Collapse Chevron */}
+                        <motion.button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(session.id);
+                          }}
+                          whileTap={{ scale: 0.9 }}
+                          className="text-mono-500 hover:text-mono-900 p-2 transition-colors rounded"
+                          title={isExpanded ? "Collapse" : "Expand"}
+                        >
+                          <motion.div
+                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <ChevronDown className="w-5 h-5" />
+                          </motion.div>
+                        </motion.button>
+                      </div>
                     </div>
                   </div>
                 </div>

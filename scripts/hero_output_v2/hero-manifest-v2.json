@@ -1,0 +1,65 @@
+{
+  "generated_at": "2025-11-17T22:48:29.487594",
+  "version": "2.0",
+  "source": "Unsplash",
+  "bucket": "prod-web-origin-962595531541",
+  "cloudfront_domain": "dixcgxyyjlm7x.cloudfront.net",
+  "path": "media/images/",
+  "images": [
+    {
+      "filename": "hero-1-asian-woman.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-1-asian-woman.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-1-asian-woman.jpg",
+      "s3_key": "media/images/hero-1-asian-woman.jpg",
+      "description": "Asian woman in sportswear ready for training",
+      "size_kb": 177,
+      "photographer": "Unsplash - Bruce Mars"
+    },
+    {
+      "filename": "hero-2-black-man.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-2-black-man.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-2-black-man.jpg",
+      "s3_key": "media/images/hero-2-black-man.jpg",
+      "description": "Athletic Black man in gym attire",
+      "size_kb": 385,
+      "photographer": "Unsplash - Andrew Tanglao"
+    },
+    {
+      "filename": "hero-3-latina-woman.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-3-latina-woman.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-3-latina-woman.jpg",
+      "s3_key": "media/images/hero-3-latina-woman.jpg",
+      "description": "Latina woman with yoga mat in sportswear",
+      "size_kb": 149,
+      "photographer": "Unsplash"
+    },
+    {
+      "filename": "hero-4-white-man.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-4-white-man.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-4-white-man.jpg",
+      "s3_key": "media/images/hero-4-white-man.jpg",
+      "description": "White man in gym clothes with towel",
+      "size_kb": 157,
+      "photographer": "Unsplash"
+    },
+    {
+      "filename": "hero-5-group-training.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-5-group-training.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-5-group-training.jpg",
+      "s3_key": "media/images/hero-5-group-training.jpg",
+      "description": "Diverse group doing partner workout training",
+      "size_kb": 247,
+      "photographer": "Unsplash - Risen Wang"
+    },
+    {
+      "filename": "hero-6-gym-buddies.jpg",
+      "url": "https://dixcgxyyjlm7x.cloudfront.net/media/images/hero-6-gym-buddies.jpg",
+      "s3_url": "https://prod-web-origin-962595531541.s3.us-east-2.amazonaws.com/media/images/hero-6-gym-buddies.jpg",
+      "s3_key": "media/images/hero-6-gym-buddies.jpg",
+      "description": "Two friends training together at the gym",
+      "size_kb": 182,
+      "photographer": "Unsplash - Jelmer Assink"
+    }
+  ],
+  "license": "Unsplash License (free for commercial use with attribution)"
+}
