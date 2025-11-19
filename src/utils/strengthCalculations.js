@@ -176,14 +176,6 @@ const STRENGTH_STANDARDS = {
     advanced: 160,
     elite: 200
   },
-  'back-2': { // Pull-ups (bodyweight + added weight)
-    name: 'Pull-up',
-    novice: 0,
-    beginner: 10,
-    intermediate: 20,
-    advanced: 35,
-    elite: 50
-  },
   'back-3': { // Barbell Row
     name: 'Barbell Row',
     novice: 40,
