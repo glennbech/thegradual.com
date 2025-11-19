@@ -59,23 +59,23 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
       </div>
 
       {/* Chart area */}
-      <div className="ml-12 h-full relative bg-mono-800 rounded border border-mono-700">
+      <div className="ml-12 h-full relative bg-white rounded border border-mono-200">
         <svg
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           className="w-full h-full"
         >
           {/* Grid lines */}
-          <line x1="0" y1="0" x2="100" y2="0" stroke="#374151" strokeWidth="0.5" />
-          <line x1="0" y1="50" x2="100" y2="50" stroke="#374151" strokeWidth="0.5" strokeDasharray="2,2" />
-          <line x1="0" y1="100" x2="100" y2="100" stroke="#374151" strokeWidth="0.5" />
+          <line x1="0" y1="0" x2="100" y2="0" stroke="#e5e5e5" strokeWidth="0.5" />
+          <line x1="0" y1="50" x2="100" y2="50" stroke="#e5e5e5" strokeWidth="0.5" strokeDasharray="2,2" />
+          <line x1="0" y1="100" x2="100" y2="100" stroke="#e5e5e5" strokeWidth="0.5" />
 
           {/* Line */}
           <motion.path
             d={linePath}
             fill="none"
             stroke={color}
-            strokeWidth="2"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
             initial={{ pathLength: 0, opacity: 0 }}
@@ -90,8 +90,10 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
               key={i}
               cx={point.x}
               cy={point.y}
-              r="1.5"
-              fill={color}
+              r="2"
+              fill="white"
+              stroke={color}
+              strokeWidth="2"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.5 + i * 0.05, duration: 0.3 }}
@@ -109,9 +111,9 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
               style={{ flex: `0 0 ${100 / chartData.points.length}%` }}
             >
               {/* Tooltip */}
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block">
-                <div className="bg-mono-900 border border-mono-700 rounded px-2 py-1 text-xs whitespace-nowrap">
-                  <div className="font-semibold" style={{ color }}>{point.value}kg</div>
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                <div className="bg-white border-2 rounded px-2 py-1 text-xs whitespace-nowrap shadow-md" style={{ borderColor: color }}>
+                  <div className="font-semibold text-mono-900">{point.value}kg</div>
                   <div className="text-mono-500">{new Date(point.date).toLocaleDateString()}</div>
                 </div>
               </div>
@@ -124,15 +126,15 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
       <div className="mt-2 flex justify-between text-xs text-mono-500">
         <div>
           <span className="text-mono-400">First: </span>
-          <span className="font-semibold">{chartData.minValue}kg</span>
+          <span className="font-semibold text-mono-900">{chartData.minValue}kg</span>
         </div>
         <div>
           <span className="text-mono-400">Latest: </span>
-          <span className="font-semibold">{chartData.maxValue}kg</span>
+          <span className="font-semibold text-mono-900">{chartData.maxValue}kg</span>
         </div>
         <div>
           <span className="text-mono-400">Gain: </span>
-          <span className="font-semibold text-emerald-500">
+          <span className="font-semibold" style={{ color }}>
             +{Math.round((chartData.maxValue - chartData.minValue) * 10) / 10}kg
           </span>
         </div>

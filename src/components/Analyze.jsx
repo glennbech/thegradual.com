@@ -211,7 +211,7 @@ export default function Analyze() {
             </div>
 
             {/* Formula Breakdown */}
-            <div>
+            <div className="pt-2">
               <div className="text-xs text-mono-500 uppercase tracking-wide mb-2">1RM Formula Breakdown</div>
               <div className="bg-mono-100 rounded-lg p-3 space-y-2 text-sm">
                 <div className="flex justify-between">
