@@ -15,26 +15,39 @@ export default function VolumeHeatmap({ data }) {
     const maxVolume = Math.max(...volumes);
     const minVolume = Math.min(...volumes.filter(v => v > 0));
 
-    // Group by week
-    const weeks = [];
-    let currentWeek = [];
-    let currentWeekNumber = data[0].weekNumber;
+    // Group by month for better organization
+    const monthsMap = new Map();
 
     data.forEach(day => {
-      if (day.weekNumber !== currentWeekNumber) {
-        weeks.push(currentWeek);
-        currentWeek = [];
-        currentWeekNumber = day.weekNumber;
+      const date = new Date(day.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthsMap.has(monthKey)) {
+        monthsMap.set(monthKey, {
+          label: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          weeks: []
+        });
       }
-      currentWeek.push(day);
+
+      const monthData = monthsMap.get(monthKey);
+
+      // Find or create week within this month
+      const weekIndex = day.weekNumber;
+      let week = monthData.weeks.find(w => w.weekNumber === weekIndex);
+
+      if (!week) {
+        week = { weekNumber: weekIndex, days: [] };
+        monthData.weeks.push(week);
+      }
+
+      week.days.push(day);
     });
 
-    if (currentWeek.length > 0) {
-      weeks.push(currentWeek);
-    }
+    // Convert to array and sort by date
+    const months = Array.from(monthsMap.values());
 
     return {
-      weeks,
+      months,
       maxVolume,
       minVolume
     };
@@ -50,7 +63,7 @@ export default function VolumeHeatmap({ data }) {
 
   // Calculate color intensity based on volume
   const getColor = (volume) => {
-    if (volume === 0) return 'bg-mono-800';
+    if (volume === 0) return 'bg-mono-200';
 
     const intensity = volume / heatmapData.maxVolume;
 
@@ -61,17 +74,17 @@ export default function VolumeHeatmap({ data }) {
     return 'bg-emerald-900';
   };
 
-  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Legend */}
       <div className="flex items-center justify-between text-xs text-mono-500">
-        <div>Last {data.length} days</div>
+        <div>Last {data.length} days of training</div>
         <div className="flex items-center gap-2">
           <span>Less</span>
           <div className="flex gap-1">
-            <div className="w-3 h-3 bg-mono-800 rounded"></div>
+            <div className="w-3 h-3 bg-mono-200 rounded"></div>
             <div className="w-3 h-3 bg-emerald-900 rounded"></div>
             <div className="w-3 h-3 bg-emerald-700 rounded"></div>
             <div className="w-3 h-3 bg-emerald-600 rounded"></div>
@@ -81,89 +94,88 @@ export default function VolumeHeatmap({ data }) {
         </div>
       </div>
 
-      {/* Heatmap grid */}
-      <div className="overflow-x-auto">
-        <div className="inline-flex gap-1">
-          {/* Day labels column */}
-          <div className="flex flex-col gap-1 pr-2">
-            <div className="h-3"></div> {/* Spacer for alignment */}
-            {dayLabels.map((day, i) => (
-              <div
-                key={i}
-                className="h-3 flex items-center justify-end text-xs text-mono-500"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
+      {/* Heatmap grid - Full width */}
+      <div className="w-full space-y-6">
+        {heatmapData.months.map((month, monthIndex) => (
+          <div key={monthIndex} className="space-y-2">
+            {/* Month label */}
+            <h3 className="text-sm font-semibold text-mono-900 uppercase tracking-wide">
+              {month.label}
+            </h3>
 
-          {/* Weeks */}
-          {heatmapData.weeks.map((week, weekIndex) => (
-            <div key={weekIndex} className="flex flex-col gap-1">
-              {/* Week number or month label */}
-              <div className="h-3 text-xs text-mono-500 text-center">
-                {weekIndex % 4 === 0 && week[0] ? (
-                  new Date(week[0].date).toLocaleDateString('en-US', { month: 'short' })
-                ) : ''}
-              </div>
+            {/* Calendar grid for this month */}
+            <div className="w-full">
+              <div className="grid grid-cols-7 gap-2">
+                {/* Day headers */}
+                {dayLabels.map((day, i) => (
+                  <div key={i} className="text-center text-xs text-mono-500 font-medium pb-1">
+                    {day}
+                  </div>
+                ))}
 
-              {/* Days in week */}
-              {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => {
-                const day = week.find(d => d.dayOfWeek === dayOfWeek);
+                {/* Days grid */}
+                {month.weeks.map(week =>
+                  week.days.map(day => {
+                    const date = new Date(day.date);
+                    const dayOfWeek = date.getDay();
 
-                if (!day) {
-                  return <div key={dayOfWeek} className="w-3 h-3"></div>;
-                }
+                    return (
+                      <motion.div
+                        key={day.date}
+                        style={{ gridColumnStart: dayOfWeek + 1 }}
+                        className={`aspect-square rounded ${getColor(day.volume)} group relative cursor-pointer flex items-center justify-center`}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: monthIndex * 0.1 + dayOfWeek * 0.02 }}
+                        whileHover={{ scale: 1.05 }}
+                      >
+                        {/* Day number */}
+                        <span className="text-xs text-mono-700 font-medium">
+                          {date.getDate()}
+                        </span>
 
-                return (
-                  <motion.div
-                    key={dayOfWeek}
-                    className={`w-3 h-3 rounded ${getColor(day.volume)} group relative cursor-pointer`}
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: weekIndex * 0.02 + dayOfWeek * 0.01 }}
-                    whileHover={{ scale: 1.5, zIndex: 10 }}
-                  >
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
-                      <div className="bg-mono-900 border border-mono-700 rounded px-2 py-1 text-xs whitespace-nowrap">
-                        <div className="font-semibold text-emerald-500">
-                          {day.volume > 0 ? `${day.volume.toLocaleString()}kg` : 'Rest day'}
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20 pointer-events-none">
+                          <div className="bg-white border-2 border-emerald-600 rounded px-3 py-2 text-xs whitespace-nowrap shadow-lg">
+                            <div className="font-semibold text-mono-900">
+                              {day.volume > 0 ? `${day.volume.toLocaleString()}kg` : 'Rest day'}
+                            </div>
+                            <div className="text-mono-500">
+                              {date.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-mono-500">
-                          {new Date(day.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
+                      </motion.div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-4 pt-4 border-t border-mono-700">
+      <div className="grid grid-cols-3 gap-4 pt-6 border-t border-mono-200">
         <div>
           <div className="text-xs text-mono-500 uppercase tracking-wide mb-1">Total Volume</div>
-          <div className="text-lg font-bold text-mono-100">
+          <div className="text-lg font-bold text-mono-900">
             {data.reduce((sum, d) => sum + d.volume, 0).toLocaleString()}kg
           </div>
         </div>
         <div>
           <div className="text-xs text-mono-500 uppercase tracking-wide mb-1">Training Days</div>
-          <div className="text-lg font-bold text-mono-100">
+          <div className="text-lg font-bold text-mono-900">
             {data.filter(d => d.volume > 0).length} days
           </div>
         </div>
         <div>
           <div className="text-xs text-mono-500 uppercase tracking-wide mb-1">Avg/Day</div>
-          <div className="text-lg font-bold text-mono-100">
+          <div className="text-lg font-bold text-mono-900">
             {Math.round(
               data.reduce((sum, d) => sum + d.volume, 0) / data.filter(d => d.volume > 0).length
             ).toLocaleString()}kg
