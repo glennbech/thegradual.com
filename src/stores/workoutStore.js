@@ -142,6 +142,25 @@ const useWorkoutStore = create(
       },
 
       /**
+       * Update a completed session (e.g., edit sets)
+       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       */
+      updateSession: async (sessionId, updates) => {
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === sessionId ? { ...s, ...updates } : s
+          ),
+        }));
+
+        try {
+          await get().syncToAPI();
+          console.log('[workoutStore] Session updated and synced to API');
+        } catch (error) {
+          console.error('[workoutStore] Failed to sync session update:', error);
+        }
+      },
+
+      /**
        * Delete a session from history
        * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
        */

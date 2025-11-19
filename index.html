@@ -4,10 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <!-- Prevent iOS Safari zoom and bounce -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="format-detection" content="telephone=no" />
     <title>thegradual.com</title>
+    <!-- Capture OAuth code IMMEDIATELY before anything else runs -->
+    <script>
+      (function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+
+        console.log('🟢 IMMEDIATE CAPTURE - URL:', window.location.href);
+        console.log('🟢 IMMEDIATE CAPTURE - CODE:', code);
+        console.log('🟢 IMMEDIATE CAPTURE - ERROR:', error);
+
+        if (code) {
+          // Store code in sessionStorage so React can access it even if URL is stripped
+          sessionStorage.setItem('oauth_code_captured', code);
+          console.log('🟢 CODE SAVED TO sessionStorage');
+        }
+        if (error) {
+          sessionStorage.setItem('oauth_error_captured', error);
+          sessionStorage.setItem('oauth_error_description', urlParams.get('error_description') || '');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
