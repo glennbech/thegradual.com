@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { awsConfig, getAuthorizeUrl } from '../config/aws';
 import { getUserId } from '../utils/userManager';
+import useWorkoutStore from '../stores/workoutStore';
 
 const AuthContext = createContext(null);
 
@@ -117,11 +118,7 @@ export const AuthProvider = ({ children }) => {
 
 
       // Check if anonymous user has any data to migrate
-      const hasLocalData =
-        localStorage.getItem('gymbot_sessions') ||
-        localStorage.getItem('gymbot_active_session') ||
-        localStorage.getItem('gymbot_custom_exercises') ||
-        localStorage.getItem('gymbot_custom_templates');
+      const hasLocalData = localStorage.getItem('thegradual-workout-store');
 
       if (!hasLocalData) {
         return;
@@ -208,6 +205,30 @@ export const AuthProvider = ({ children }) => {
       // ==========================================
       await migrateAnonymousData(userInfo.sub);
 
+      // ==========================================
+      // SAFE CACHE RELOAD FROM API
+      // ==========================================
+      console.log('🔄 Attempting to load fresh data from API after login...');
+
+      // Get Zustand store methods
+      const workoutStore = useWorkoutStore.getState();
+
+      // Clear localStorage cache FIRST (to prevent stale data)
+      // The Zustand persist middleware will pick up the cleared state
+      localStorage.removeItem('thegradual-workout-store');
+      console.log('🗑️ Cleared Zustand localStorage cache');
+
+      // Try to load fresh data from API
+      const result = await workoutStore.loadFromAPI();
+
+      if (result.success) {
+        console.log('✅ Successfully loaded fresh data from API');
+      } else {
+        console.warn('⚠️ Failed to load from API, but continuing with login:', result.error);
+        // Note: User will see empty state initially, but can still use the app
+        // Their data is safely stored in API under their Cognito sub
+      }
+
       // Set user info
       setUser(userInfo);
       setIsAuthenticated(true);
@@ -262,10 +283,19 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear local state
+      // Clear Zustand cache
+      const workoutStore = useWorkoutStore.getState();
+      workoutStore.clearCache();
+
+      // Clear localStorage (Zustand persist will handle this too)
+      localStorage.removeItem('thegradual-workout-store');
       localStorage.removeItem('idToken');
+
+      // Clear auth state
       setUser(null);
       setIsAuthenticated(false);
+
+      console.log('✅ Logout complete, cache cleared');
     }
   };
 

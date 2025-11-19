@@ -15,8 +15,7 @@ import {
   Dumbbell,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { sessionService } from '../services/stateService';
-import { useActiveSession } from '../hooks/useStateManager';
+import useWorkoutStore from '../stores/workoutStore';
 import { headingStyles, iconSizes } from '../utils/typography';
 import { ComparisonRow } from './ComparisonBadge';
 import { getMuscleColor, formatDuration, colors, comparePerformance } from '../utils/design-system';
@@ -29,7 +28,13 @@ export default function ExerciseLogger({
   onComplete,
   onSessionCreated,
 }) {
-  const { activeSession, setActiveSession, loading: activeSessionLoading } = useActiveSession();
+  // Zustand store
+  const activeSession = useWorkoutStore((state) => state.activeSession);
+  const startSession = useWorkoutStore((state) => state.startSession);
+  const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession);
+  const completeSession = useWorkoutStore((state) => state.completeSession);
+  const getPreviousSessionForExercise = useWorkoutStore((state) => state.getPreviousSessionForExercise);
+  const sessions = useWorkoutStore((state) => state.sessions);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [sets, setSets] = useState([]);
   const [currentSet, setCurrentSet] = useState({ reps: 10, weight: 20 });
@@ -47,6 +52,12 @@ export default function ExerciseLogger({
   const [sessionStartTime] = useState(Date.now());
   const [sessionTime, setSessionTime] = useState(0);
   const hasInitialized = useRef(false);
+
+  // Exercise Timer & Rest Timer
+  const [exerciseStartTime, setExerciseStartTime] = useState(Date.now());
+  const [exerciseTime, setExerciseTime] = useState(0);
+  const [isResting, setIsResting] = useState(false);
+  const [restTimeRemaining, setRestTimeRemaining] = useState(90); // 1:30 in seconds
 
   // Add Set Form - Collapsed by default
   const [showAddSetForm, setShowAddSetForm] = useState(false);
@@ -133,12 +144,7 @@ export default function ExerciseLogger({
 
   // Initialize session - runs once on mount
   useEffect(() => {
-    // CRITICAL: Wait for activeSession to finish loading before making decisions
-    if (activeSessionLoading) {
-      return;
-    }
-
-    // If we already have an activeSession from StateManager, restore UI state from it
+    // If we already have an activeSession from Zustand, restore UI state from it
     if (activeSession && !hasInitialized.current) {
       hasInitialized.current = true;
       // activeSession already has all the data, just return
@@ -158,55 +164,49 @@ export default function ExerciseLogger({
 
     const initSession = async () => {
       try {
-
         // Get previous session data if template is specified
         let previousSession = null;
         if (templateReference?.templateId) {
-          previousSession = await sessionService.getPreviousSessionByTemplate(
-            templateReference.templateId
-          );
-        } else {
+          // Find most recent session with this template
+          const sortedSessions = sessions
+            .filter(s => s.templateReference?.templateId === templateReference.templateId && s.status === 'completed')
+            .sort((a, b) => new Date(b.completedAt || b.endTime) - new Date(a.completedAt || a.endTime));
+          previousSession = sortedSessions[0];
         }
 
-        // Create new session with exercises
-        const newSession = {
-          exercises: exercises.map((ex, idx) => {
-            // Find matching exercise in previous session
-            const prevExercise = previousSession?.exercises?.find(
-              (prevEx) => prevEx.id === ex.id
-            );
+        // Prepare exercises with pre-populated sets
+        const preparedExercises = exercises.map((ex) => {
+          // Find matching exercise in previous session
+          const prevExercise = previousSession?.exercises?.find(
+            (prevEx) => prevEx.id === ex.id
+          );
 
+          // Pre-populate sets from previous session as PLANNED (not yet completed)
+          const prePopulatedSets = prevExercise?.sets?.map((set) => ({
+            reps: set.reps,
+            weight: set.weight,
+            setType: set.setType || 'working',
+            completed: false, // IMPORTANT: Mark as planned, not completed!
+            plannedFromPrevious: true,
+          })) || [];
 
-            // Pre-populate sets from previous session as PLANNED (not yet completed)
-            const prePopulatedSets = prevExercise?.sets?.map((set) => ({
-              reps: set.reps,
-              weight: set.weight,
-              setType: set.setType || 'working',
-              completed: false, // IMPORTANT: Mark as planned, not completed!
-              plannedFromPrevious: true,
-            })) || [];
+          // If no previous session data, create default planned sets
+          const defaultPlannedSets = [
+            { reps: 10, weight: 20, completed: false, setType: 'working' },
+            { reps: 10, weight: 20, completed: false, setType: 'working' },
+            { reps: 10, weight: 20, completed: false, setType: 'working' },
+          ];
 
-            // If no previous session data, create default planned sets
-            const defaultPlannedSets = [
-              { reps: 10, weight: 20, completed: false, setType: 'working' },
-              { reps: 10, weight: 20, completed: false, setType: 'working' },
-              { reps: 10, weight: 20, completed: false, setType: 'working' },
-            ];
+          const initialSets = prePopulatedSets.length > 0 ? prePopulatedSets : defaultPlannedSets;
 
-            const initialSets = prePopulatedSets.length > 0 ? prePopulatedSets : defaultPlannedSets;
+          return {
+            ...ex,
+            sets: initialSets,
+          };
+        });
 
-
-            return {
-              ...ex,
-              sets: initialSets,
-            };
-          }),
-          startTime: Date.now(),
-          templateReference: templateReference || null,
-        };
-
-        const session = await sessionService.create(newSession);
-        setActiveSession(session);
+        // Create session using Zustand store (await for API persistence)
+        const session = await startSession(preparedExercises, templateReference);
         if (onSessionCreated) {
           onSessionCreated(session);
         }
@@ -217,7 +217,7 @@ export default function ExerciseLogger({
     };
 
     initSession();
-  }, [activeSessionLoading, activeSession, exercises, templateReference, setActiveSession, onSessionCreated]);
+  }, [activeSession, exercises, templateReference, startSession, onSessionCreated, sessions]);
 
   // Session timer
   useEffect(() => {
@@ -228,6 +228,50 @@ export default function ExerciseLogger({
     }, 1000);
     return () => clearInterval(interval);
   }, [activeSession, sessionStartTime]);
+
+  // Exercise timer - tracks time since exercise started
+  useEffect(() => {
+    if (isResting) return; // Don't update exercise time during rest
+
+    const interval = setInterval(() => {
+      setExerciseTime(Math.floor((Date.now() - exerciseStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [exerciseStartTime, isResting]);
+
+  // Rest timer - counts down from 90 seconds
+  useEffect(() => {
+    if (!isResting) return;
+
+    const interval = setInterval(() => {
+      setRestTimeRemaining((prev) => {
+        if (prev <= 1) {
+          // Rest time is up - celebration and switch back to exercise timer
+          confetti({
+            particleCount: 50,
+            spread: 70,
+            origin: { y: 0.3 },
+            colors: ['#F97316', '#10B981'],
+            scalar: 1.0,
+          });
+          setIsResting(false);
+          setRestTimeRemaining(90); // Reset for next time
+          return 90;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isResting]);
+
+  // Reset exercise timer when changing exercises
+  useEffect(() => {
+    setExerciseStartTime(Date.now());
+    setExerciseTime(0);
+    setIsResting(false);
+    setRestTimeRemaining(90);
+  }, [currentExerciseIndex]);
 
   // Load exercise data - SIMPLIFIED: Just sync what's in activeSession
   useEffect(() => {
@@ -241,9 +285,8 @@ export default function ExerciseLogger({
     setSets(currentEx.sets || []);
 
     // Load previous session data for display only (doesn't modify current sets)
-    sessionService.getPreviousSessionForExercise(currentEx.id).then((prevData) => {
-      setPreviousSessionData(prevData);
-    });
+    const prevData = getPreviousSessionForExercise(currentEx.id);
+    setPreviousSessionData(prevData);
   }, [currentExerciseIndex, activeSession]);
 
   // Update comparison when sets change
@@ -292,17 +335,18 @@ export default function ExerciseLogger({
         setTimeout(() => {
           celebrateExercise();
         }, 300);
+      } else {
+        // Start rest timer after completing a set (but not the last one)
+        setIsResting(true);
+        setRestTimeRemaining(90);
       }
+    } else {
+      // If unchecking a set, stop resting
+      setIsResting(false);
     }
 
-    // Update StateManager
-    sessionService.update(activeSession.id, { exercises: updatedExercises })
-      .then((updated) => {
-        setActiveSession(updated);
-      })
-      .catch((error) => {
-        console.error('Error updating session:', error);
-      });
+    // Update Zustand store
+    updateActiveSession({ exercises: updatedExercises });
   };
 
   const handleAddSet = (setData = null) => {
@@ -319,9 +363,7 @@ export default function ExerciseLogger({
     const updatedExercises = [...activeSession.exercises];
     updatedExercises[currentExerciseIndex].sets = [...sets, newSet];
 
-    sessionService.update(activeSession.id, { exercises: updatedExercises }).then((updated) => {
-      setActiveSession(updated);
-    });
+    updateActiveSession({ exercises: updatedExercises });
 
     setSets([...sets, newSet]);
 
@@ -338,7 +380,7 @@ export default function ExerciseLogger({
     const updatedExercises = [...activeSession.exercises];
     updatedExercises[currentExerciseIndex].sets = updatedSets;
 
-    sessionService.update(activeSession.id, { exercises: updatedExercises }).then(setActiveSession);
+    updateActiveSession({ exercises: updatedExercises });
 
     setSets(updatedSets);
   };
@@ -362,7 +404,7 @@ export default function ExerciseLogger({
     const updatedExercises = [...activeSession.exercises];
     updatedExercises[currentExerciseIndex].sets = updatedSets;
 
-    sessionService.update(activeSession.id, { exercises: updatedExercises }).then(setActiveSession);
+    updateActiveSession({ exercises: updatedExercises });
 
     setSets(updatedSets);
     setEditingSetIndex(null);
@@ -379,7 +421,7 @@ export default function ExerciseLogger({
       setShowSetTypeSelector(false);
 
       // Save current exercise index to activeSession
-      sessionService.update(activeSession.id, { currentExerciseIndex: newIndex }).then(setActiveSession);
+      updateActiveSession({ currentExerciseIndex: newIndex });
     }
   };
 
@@ -393,7 +435,7 @@ export default function ExerciseLogger({
       setShowSetTypeSelector(false);
 
       // Save current exercise index to activeSession
-      sessionService.update(activeSession.id, { currentExerciseIndex: newIndex }).then(setActiveSession);
+      updateActiveSession({ currentExerciseIndex: newIndex });
     }
   };
 
@@ -429,56 +471,33 @@ export default function ExerciseLogger({
   };
 
   const confirmCompleteWorkout = async () => {
-    console.log('🔵 [ExerciseLogger] confirmCompleteWorkout - START');
-    console.log('🔵 [ExerciseLogger] activeSession:', activeSession);
-    console.log('🔵 [ExerciseLogger] onComplete callback exists?', !!onComplete);
-
-    // Close the dialog first
     setShowCompleteDialog(false);
-    console.log('🔵 [ExerciseLogger] Dialog closed');
 
     try {
-      // Store session ID before clearing
-      const sessionId = activeSession.id;
-      console.log('🔵 [ExerciseLogger] Stored session ID:', sessionId);
-
       // Celebrate workout completion!
-      console.log('🔵 [ExerciseLogger] Starting confetti celebration');
       celebrateWorkout();
 
-      // Complete the session (moves to history, clears active in StateManager)
-      console.log('🔵 [ExerciseLogger] Calling sessionService.complete with ID:', sessionId);
-      const completedSession = await sessionService.complete(sessionId);
-      console.log('🔵 [ExerciseLogger] Session completed successfully:', completedSession);
-
-      // CRITICAL: Clear active session in local state AFTER completing
-      console.log('🔵 [ExerciseLogger] Clearing activeSession in local state');
-      setActiveSession(null);
-      console.log('🔵 [ExerciseLogger] activeSession cleared');
+      // Complete the session using Zustand (automatically moves to history and clears active)
+      // AWAIT for API persistence before navigating
+      const completedSession = await completeSession();
 
       // Navigate immediately - confetti will continue running on the history page
-      console.log('🔵 [ExerciseLogger] Calling onComplete callback immediately');
-      if (onComplete) {
-        console.log('🔵 [ExerciseLogger] Calling onComplete with:', {
-          exercises: completedSession.exercises,
-          sessionId: completedSession.id
-        });
+      if (onComplete && completedSession) {
         onComplete(completedSession.exercises, completedSession.id);
-        console.log('🔵 [ExerciseLogger] onComplete callback executed');
-      } else {
-        console.error('❌ [ExerciseLogger] onComplete callback is missing!');
       }
     } catch (error) {
-      console.error('❌ [ExerciseLogger] Error completing workout:', error);
+      console.error('[ExerciseLogger] Error completing workout:', error);
       alert('Error completing workout. Please try again.');
     }
   };
 
   const handleSaveSession = async () => {
     if (confirm('Save and exit this workout?')) {
-      const completedSession = await sessionService.complete(activeSession.id);
-      setActiveSession(null);
-      onComplete?.(completedSession.exercises, completedSession.id);
+      // AWAIT for API persistence before navigating
+      const completedSession = await completeSession();
+      if (onComplete && completedSession) {
+        onComplete(completedSession.exercises, completedSession.id);
+      }
     }
   };
 
@@ -525,8 +544,14 @@ export default function ExerciseLogger({
       />
 
       <div className="space-y-4 pb-32">
-      {/* Prominent Progress Bar */}
-      <div className="bg-mono-900 border-b-4 border-mono-900 -mx-4">
+      {/* Prominent Progress Bar - 50% Taller */}
+      <motion.div
+        className="border-b-4 border-mono-900 -mx-4"
+        animate={{
+          backgroundColor: isResting ? '#ea580c' : '#111827' // Orange when resting, dark when exercising
+        }}
+        transition={{ duration: 0.5 }}
+      >
         {/* Progress Bar Visual */}
         <div className="h-2 bg-mono-700">
           <motion.div
@@ -539,51 +564,84 @@ export default function ExerciseLogger({
           />
         </div>
 
-        {/* Stats Row */}
-        <div className="px-4 py-3 flex items-center justify-between">
-          {/* Time Elapsed */}
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-white" strokeWidth={2.5} />
+        {/* Stats Row - 50% taller (py-3 -> py-5) */}
+        <div className="px-4 py-5 flex items-center justify-between">
+          {/* Exercise Progress - PROMINENT */}
+          <div className="flex items-center gap-3">
+            <Dumbbell className="w-6 h-6 text-white" strokeWidth={2.5} />
             <div>
-              <div className="text-xs text-white/60 uppercase tracking-wide">Time</div>
-              <div className="text-sm font-bold text-white tabular-nums">
-                {formatDuration(sessionTime)}
-              </div>
-            </div>
-          </div>
-
-          {/* Exercise Progress */}
-          <div className="flex items-center gap-2">
-            <Dumbbell className="w-4 h-4 text-white" strokeWidth={2.5} />
-            <div className="text-right">
-              <div className="text-xs text-white/60 uppercase tracking-wide">Exercises</div>
-              <div className="text-sm font-bold text-white tabular-nums">
+              <div className="text-xs text-white/60 uppercase tracking-wide mb-0.5">Exercise</div>
+              <div className="text-2xl font-black text-white tabular-nums">
                 {currentExerciseIndex + 1}/{activeSession.exercises.length}
               </div>
             </div>
           </div>
 
-          {/* Sets Progress */}
-          <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-white" strokeWidth={2.5} />
-            <div className="text-right">
-              <div className="text-xs text-white/60 uppercase tracking-wide">Sets</div>
-              <div className="text-sm font-bold text-white tabular-nums">
-                {totalSetsCompleted}
-              </div>
-            </div>
-          </div>
+          {/* Timer Display - Switches between Exercise Timer and Rest Timer */}
+          <AnimatePresence mode="wait">
+            {isResting ? (
+              <motion.div
+                key="rest-timer"
+                initial={{ scale: 0.8, opacity: 0, y: -10 }}
+                animate={{
+                  scale: 1,
+                  opacity: 1,
+                  y: 0,
+                }}
+                exit={{ scale: 0.8, opacity: 0, y: 10 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex items-center gap-3"
+              >
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
+                >
+                  <Clock className="w-6 h-6 text-orange-300" strokeWidth={2.5} />
+                </motion.div>
+                <div className="text-center">
+                  <div className="text-xs text-orange-200 uppercase tracking-wide mb-0.5 font-bold">Rest Timer</div>
+                  <motion.div
+                    className="text-2xl font-black text-orange-300 tabular-nums"
+                    animate={{
+                      scale: restTimeRemaining <= 10 ? [1, 1.1, 1] : 1,
+                      color: restTimeRemaining <= 10 ? ['#fdba74', '#fbbf24', '#fdba74'] : '#fdba74'
+                    }}
+                    transition={{ duration: 0.5, repeat: restTimeRemaining <= 10 ? Infinity : 0 }}
+                  >
+                    {Math.floor(restTimeRemaining / 60)}:{String(restTimeRemaining % 60).padStart(2, '0')}
+                  </motion.div>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="exercise-timer"
+                initial={{ scale: 0.8, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.8, opacity: 0, y: -10 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex items-center gap-3"
+              >
+                <Clock className="w-6 h-6 text-white" strokeWidth={2.5} />
+                <div className="text-center">
+                  <div className="text-xs text-white/60 uppercase tracking-wide mb-0.5">Exercise Time</div>
+                  <div className="text-2xl font-black text-white tabular-nums">
+                    {formatDuration(exerciseTime)}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Discard Button */}
           <motion.button
             onClick={handleDiscardSession}
-            className="text-white/60 hover:text-white ml-2"
+            className="text-white/60 hover:text-white"
             whileTap={{ scale: 0.95 }}
           >
-            <Trash2 className="w-5 h-5" strokeWidth={2.5} />
+            <Trash2 className="w-6 h-6" strokeWidth={2.5} />
           </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Exercise Navigation Bar - Cleaner */}
       <div className="bg-white border-2 border-mono-900">
@@ -711,6 +769,13 @@ export default function ExerciseLogger({
                               setEditingSetData({ ...editingSetData, reps: val });
                             }
                           }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveEditSet();
+                            } else if (e.key === 'Escape') {
+                              handleCancelEditSet();
+                            }
+                          }}
                           className="w-full h-12 px-3 border-2 border-mono-900 bg-white text-mono-900 text-lg font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
                         />
                       </div>
@@ -727,6 +792,13 @@ export default function ExerciseLogger({
                             const val = parseFloat(e.target.value) || 0;
                             if (val >= 0 && val <= 500) {
                               setEditingSetData({ ...editingSetData, weight: val });
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveEditSet();
+                            } else if (e.key === 'Escape') {
+                              handleCancelEditSet();
                             }
                           }}
                           className="w-full h-12 px-3 border-2 border-mono-900 bg-white text-mono-900 text-lg font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"

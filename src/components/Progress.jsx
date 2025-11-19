@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Loader } from 'lucide-react';
-import { sessionService, exerciseService } from '../services/stateService';
+import useWorkoutStore from '../stores/workoutStore';
+import defaultExercises from '../data/exercises.json';
 import {
   getPerformedExercises,
   getExerciseStats,
@@ -32,11 +33,12 @@ export default function Progress() {
     setLoading(true);
 
     try {
-      // Load sessions and exercises
-      const [sessionsData, exercisesData] = await Promise.all([
-        sessionService.getAll(),
-        exerciseService.getAll()
-      ]);
+      // Load sessions from Zustand store
+      const sessionsData = useWorkoutStore.getState().getSessions();
+      const customExercises = useWorkoutStore.getState().getCustomExercises();
+
+      // Combine default and custom exercises
+      const exercisesData = [...defaultExercises, ...customExercises];
 
       // Filter only completed sessions
       const completedSessions = sessionsData.filter(s => s.status === 'completed');

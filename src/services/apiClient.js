@@ -47,19 +47,28 @@ export async function fetchUserState() {
 
     const data = await response.json();
 
-    // API always returns full structure (even for new users)
+    // Lambda returns JSON strings - parse them back into objects
+    const parsedData = {
+      uuid: data.uuid,
+      sessions: JSON.parse(data.sessions || '[]'),
+      customExercises: JSON.parse(data.customExercises || '[]'),
+      customTemplates: JSON.parse(data.customTemplates || '[]'),
+      activeSession: JSON.parse(data.activeSession || 'null'),
+      lastUpdated: data.lastUpdated,
+    };
+
     // Check if this is an empty state (no data in arrays/objects)
     const isEmpty =
-      (!data.sessions || data.sessions.length === 0) &&
-      (!data.customExercises || data.customExercises.length === 0) &&
-      (!data.customTemplates || data.customTemplates.length === 0) &&
-      !data.activeSession;
+      parsedData.sessions.length === 0 &&
+      parsedData.customExercises.length === 0 &&
+      parsedData.customTemplates.length === 0 &&
+      !parsedData.activeSession;
 
     if (isEmpty) {
       return null;
     }
 
-    return data;
+    return parsedData;
   } catch (error) {
     if (error.name === 'AbortError') {
       console.error('API request timeout');
@@ -82,13 +91,13 @@ export async function fetchUserState() {
 export async function saveUserState(state) {
   const userId = getUserId();
 
-  // Build UserState object
+  // Build UserState object - Lambda expects JSON strings, not objects!
   const userState = {
     uuid: userId,
-    sessions: state.sessions || [],
-    customExercises: state.customExercises || [],
-    customTemplates: state.customTemplates || [],
-    activeSession: state.activeSession || null,
+    sessions: JSON.stringify(state.sessions || []),
+    customExercises: JSON.stringify(state.customExercises || []),
+    customTemplates: JSON.stringify(state.customTemplates || []),
+    activeSession: JSON.stringify(state.activeSession || null),
     lastUpdated: new Date().toISOString(),
   };
 
@@ -121,48 +130,6 @@ export async function saveUserState(state) {
     console.error('Error saving user state:', error);
     throw error;
   }
-}
-
-/**
- * Sync localStorage to API
- * Reads all relevant localStorage keys and saves to backend
- * @returns {Promise<UserState>} Saved user state
- */
-export async function syncToAPI() {
-  const state = {
-    sessions: JSON.parse(localStorage.getItem('gymbot_sessions') || '[]'),
-    customExercises: JSON.parse(localStorage.getItem('gymbot_custom_exercises') || '[]'),
-    customTemplates: JSON.parse(localStorage.getItem('gymbot_custom_templates') || '[]'),
-    activeSession: JSON.parse(localStorage.getItem('gymbot_active_session') || 'null'),
-  };
-
-  return saveUserState(state);
-}
-
-/**
- * Load user state from API to localStorage
- * @returns {Promise<boolean>} True if data was loaded, false if no data exists
- */
-export async function loadFromAPI() {
-  const userState = await fetchUserState();
-
-  if (!userState) {
-    // No data in API - user is new or hasn't synced yet
-    return false;
-  }
-
-  // Update localStorage with API data (using existing keys)
-  localStorage.setItem('gymbot_sessions', JSON.stringify(userState.sessions || []));
-  localStorage.setItem('gymbot_custom_exercises', JSON.stringify(userState.customExercises || []));
-  localStorage.setItem('gymbot_custom_templates', JSON.stringify(userState.customTemplates || []));
-
-  if (userState.activeSession) {
-    localStorage.setItem('gymbot_active_session', JSON.stringify(userState.activeSession));
-  } else {
-    localStorage.removeItem('gymbot_active_session');
-  }
-
-  return true;
 }
 
 /**

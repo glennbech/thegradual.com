@@ -12,16 +12,21 @@ import FloatingSessionIndicator from './components/FloatingSessionIndicator'
 import TransferConfirmation from './components/TransferConfirmation'
 import AuthButton from './components/AuthButton'
 import WelcomeOnboardingModal from './components/WelcomeOnboardingModal'
-import { AuthProvider } from './contexts/AuthContext'
-import { useActiveSession, useSyncStatus } from './hooks/useStateManager'
-import { initializeState } from './services/stateService'
+import LandingPage from './components/LandingPage'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getUserId } from './utils/userManager'
-import StateManager from './services/StateManager'
+import useWorkoutStore from './stores/workoutStore'
 
-function App() {
-  const { activeSession, loading, setActiveSession, clearActiveSession } = useActiveSession()
-  const { isOnline, lastSync } = useSyncStatus()
-  const [isInitializing, setIsInitializing] = useState(true)
+function AppContent() {
+  // Auth state
+  const { isAuthenticated } = useAuth()
+
+  // Zustand store
+  const activeSession = useWorkoutStore((state) => state.activeSession)
+  const isOnline = useWorkoutStore((state) => state.isOnline)
+  const lastSync = useWorkoutStore((state) => state.lastSync)
+  const clearActiveSession = useWorkoutStore((state) => state.clearActiveSession)
+  const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession)
   const [currentView, setCurrentView] = useState('home')
   const [selectedExercises, setSelectedExercises] = useState([])
   const [templateReference, setTemplateReference] = useState(null)
@@ -32,7 +37,7 @@ function App() {
   const userId = getUserId() // Get or create user UUID
 
   // Check if synced recently (within last 5 seconds)
-  const isSynced = lastSync && (Date.now() - lastSync.getTime() < 5000)
+  const isSynced = lastSync && (Date.now() - new Date(lastSync).getTime() < 5000)
 
   // Debug logging for view changes
   useEffect(() => {
@@ -47,21 +52,6 @@ function App() {
     if (userIdParam) {
       setTransferUserId(userIdParam)
     }
-  }, [])
-
-  // Initialize StateManager on app startup
-  useEffect(() => {
-    const initApp = async () => {
-      try {
-        await initializeState()
-      } catch (error) {
-        console.error('Failed to initialize StateManager:', error)
-      } finally {
-        setIsInitializing(false)
-      }
-    }
-
-    initApp()
   }, [])
 
   // Initialize history state
@@ -95,37 +85,24 @@ function App() {
   }
 
   const handleSessionCreated = (session) => {
-    setActiveSession(session)
+    // Session is already created in the store by ExerciseLogger
+    // This callback is just for compatibility
   }
 
   const handleCompleteSession = (completedExercises, sessionId) => {
-    console.log('🟢 [App] handleCompleteSession - START');
-    console.log('🟢 [App] completedExercises:', completedExercises);
-    console.log('🟢 [App] sessionId:', sessionId);
-    console.log('🟢 [App] currentView BEFORE:', currentView);
-    console.log('🟢 [App] activeSession BEFORE:', activeSession);
-
     // Keep exercises for "do it again" functionality
     if (completedExercises) {
-      console.log('🟢 [App] Setting selectedExercises');
       setSelectedExercises(completedExercises)
     }
 
     // Store the completed session ID to auto-expand in history
     if (sessionId) {
-      console.log('🟢 [App] Setting completedSessionId:', sessionId);
       setCompletedSessionId(sessionId)
     }
 
-    // Clear active session in App state (should already be null from StateManager)
-    console.log('🟢 [App] Clearing activeSession in App state');
-    setActiveSession(null)
-
-    console.log('🟢 [App] Changing view to history');
+    // Navigate to history (activeSession is already cleared by Zustand store)
     setCurrentView('history')
-    console.log('🟢 [App] Pushing history state');
     window.history.pushState({ view: 'history' }, '', window.location.pathname)
-    console.log('🟢 [App] handleCompleteSession - COMPLETE');
   }
 
   const handleDoItAgain = (exercises) => {
@@ -173,26 +150,13 @@ function App() {
     { id: 'profile', label: 'Profile', icon: User }, // Replaced Health with Profile
   ]
 
-  // Show loading screen while initializing
-  if (isInitializing || loading) {
-    return (
-      <div className="min-h-screen bg-mono-50 flex items-center justify-center">
-        <div className="text-center">
-          <Dumbbell size={48} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
-          <h2 className="text-xl font-bold text-mono-900 mb-2">
-            Loading your workouts...
-          </h2>
-          <p className="text-sm text-mono-600">
-            Syncing from cloud...
-          </p>
-        </div>
-      </div>
-    )
+  // Show landing page if not authenticated
+  if (!isAuthenticated) {
+    return <LandingPage />;
   }
 
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-mono-50 pb-16">
+    <div className="min-h-screen bg-mono-50 pb-16">
         {/* Header */}
         <motion.header
           initial={{ y: -100 }}
@@ -327,7 +291,14 @@ function App() {
 
       {/* Welcome Onboarding Modal (for new users) */}
       <WelcomeOnboardingModal />
-      </div>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   )
 }

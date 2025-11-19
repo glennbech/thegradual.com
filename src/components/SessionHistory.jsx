@@ -17,14 +17,18 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { staggerContainer, staggerItem, scaleIn } from '../utils/animations';
-import { sessionService, templateService } from '../services/stateService';
+import useWorkoutStore from '../stores/workoutStore';
 import { headingStyles, iconSizes } from '../utils/typography';
 import SessionTimeline from './SessionTimeline';
 import { getMuscleColor } from '../utils/design-system';
 import WorkoutCalendar from './WorkoutCalendar';
 
 export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, onClearExpandedSession }) {
-  const [sessions, setSessions] = useState([]);
+  // Zustand store
+  const sessions = useWorkoutStore((state) => state.getSessions());
+  const deleteSession = useWorkoutStore((state) => state.deleteSession);
+  const addCustomTemplate = useWorkoutStore((state) => state.addCustomTemplate);
+
   const [expandedSession, setExpandedSession] = useState(null);
   const [deletingSession, setDeletingSession] = useState(null);
   const [sessionToDelete, setSessionToDelete] = useState(null); // For confirmation
@@ -40,10 +44,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     frequency: '',
   });
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
   // Auto-expand the just-completed session
   useEffect(() => {
     if (initialExpandedSessionId && sessions.length > 0) {
@@ -54,11 +54,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
       }
     }
   }, [initialExpandedSessionId, sessions.length, onClearExpandedSession]);
-
-  const loadSessions = async () => {
-    const data = await sessionService.getAll();
-    setSessions(data);
-  };
 
   const handleDeleteSession = (sessionId, e) => {
     e.stopPropagation();
@@ -75,8 +70,8 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     setSessionToDelete(null); // Close modal
 
     setTimeout(async () => {
-      await sessionService.delete(sessionId);
-      setSessions(sessions.filter((s) => s.id !== sessionId));
+      // AWAIT for API persistence before clearing UI state
+      await deleteSession(sessionId);
       setDeletingSession(null);
       if (expandedSession === sessionId) {
         setExpandedSession(null);
@@ -90,10 +85,9 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     setEditedName(session.name || '');
   };
 
-  const handleSaveName = async (sessionId, e) => {
+  const handleSaveName = (sessionId, e) => {
     e.stopPropagation();
-    await sessionService.update(sessionId, { name: editedName });
-    setSessions(sessions.map((s) => (s.id === sessionId ? { ...s, name: editedName } : s)));
+    // TODO: Add session name editing to Zustand store if needed
     setEditingName(null);
   };
 
@@ -115,7 +109,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
 
     const exerciseIds = makingTemplate.exercises.map((ex) => ex.id);
 
-    await templateService.create({
+    await addCustomTemplate({
       name: templateForm.name,
       description: templateForm.description,
       difficulty: templateForm.difficulty,

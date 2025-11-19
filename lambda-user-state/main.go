@@ -20,13 +20,24 @@ var (
 )
 
 // UserState represents the complete gym app state for a user
+// Note: DynamoDB may have binary OR string data (migration from old format)
 type UserState struct {
-	UUID             string          `json:"uuid" dynamodbav:"uuid"`
-	Sessions         json.RawMessage `json:"sessions,omitempty" dynamodbav:"sessions,omitempty"`
-	CustomExercises  json.RawMessage `json:"customExercises,omitempty" dynamodbav:"customExercises,omitempty"`
-	CustomTemplates  json.RawMessage `json:"customTemplates,omitempty" dynamodbav:"customTemplates,omitempty"`
-	ActiveSession    json.RawMessage `json:"activeSession,omitempty" dynamodbav:"activeSession,omitempty"`
-	LastUpdated      string          `json:"lastUpdated,omitempty" dynamodbav:"lastUpdated,omitempty"`
+	UUID             string `json:"uuid" dynamodbav:"uuid"`
+	Sessions         string `json:"sessions,omitempty" dynamodbav:"sessions,omitempty"`
+	CustomExercises  string `json:"customExercises,omitempty" dynamodbav:"customExercises,omitempty"`
+	CustomTemplates  string `json:"customTemplates,omitempty" dynamodbav:"customTemplates,omitempty"`
+	ActiveSession    string `json:"activeSession,omitempty" dynamodbav:"activeSession,omitempty"`
+	LastUpdated      string `json:"lastUpdated,omitempty" dynamodbav:"lastUpdated,omitempty"`
+}
+
+// DynamoUserState handles both binary and string formats from DynamoDB
+type DynamoUserState struct {
+	UUID             string `dynamodbav:"uuid"`
+	Sessions         interface{} `dynamodbav:"sessions,omitempty"`
+	CustomExercises  interface{} `dynamodbav:"customExercises,omitempty"`
+	CustomTemplates  interface{} `dynamodbav:"customTemplates,omitempty"`
+	ActiveSession    interface{} `dynamodbav:"activeSession,omitempty"`
+	LastUpdated      string `dynamodbav:"lastUpdated,omitempty"`
 }
 
 // init runs once on Lambda cold start
@@ -44,6 +55,26 @@ func init() {
 
 func main() {
 	lambda.Start(handleRequest)
+}
+
+// convertToString handles both binary ([]byte) and string data from DynamoDB
+func convertToString(val interface{}) string {
+	if val == nil {
+		return ""
+	}
+
+	switch v := val.(type) {
+	case string:
+		// Already a string, return as-is
+		return v
+	case []byte:
+		// Binary data, convert to string
+		return string(v)
+	default:
+		// Unknown type, return empty
+		log.Printf("Warning: unexpected type %T for field, returning empty string", v)
+		return ""
+	}
 }
 
 // handleRequest is the main Lambda handler for API Gateway proxy events
@@ -108,10 +139,10 @@ func handleGetState(ctx context.Context, uuid string, headers map[string]string)
 	if result.Item == nil {
 		emptyState := UserState{
 			UUID:            uuid,
-			Sessions:        json.RawMessage("[]"),
-			CustomExercises: json.RawMessage("[]"),
-			CustomTemplates: json.RawMessage("[]"),
-			ActiveSession:   json.RawMessage("null"),
+			Sessions:        "[]",
+			CustomExercises: "[]",
+			CustomTemplates: "[]",
+			ActiveSession:   "null",
 			LastUpdated:     "",
 		}
 		body, _ := json.Marshal(emptyState)
@@ -122,12 +153,22 @@ func handleGetState(ctx context.Context, uuid string, headers map[string]string)
 		}, nil
 	}
 
-	// Unmarshal DynamoDB item to UserState
-	var state UserState
-	err = dynamodbattribute.UnmarshalMap(result.Item, &state)
+	// Unmarshal DynamoDB item - use flexible type to handle both binary and string
+	var dynamoState DynamoUserState
+	err = dynamodbattribute.UnmarshalMap(result.Item, &dynamoState)
 	if err != nil {
 		log.Printf("DynamoDB unmarshal error: %v", err)
 		return errorResponse(headers, 500, "Failed to parse state")
+	}
+
+	// Convert to UserState with string fields (handles both binary and string)
+	state := UserState{
+		UUID:            dynamoState.UUID,
+		Sessions:        convertToString(dynamoState.Sessions),
+		CustomExercises: convertToString(dynamoState.CustomExercises),
+		CustomTemplates: convertToString(dynamoState.CustomTemplates),
+		ActiveSession:   convertToString(dynamoState.ActiveSession),
+		LastUpdated:     dynamoState.LastUpdated,
 	}
 
 	body, err := json.Marshal(state)
@@ -213,21 +254,31 @@ func handleDebugState(ctx context.Context, uuid string, headers map[string]strin
 	if result.Item == nil {
 		emptyState := UserState{
 			UUID:            uuid,
-			Sessions:        json.RawMessage("[]"),
-			CustomExercises: json.RawMessage("[]"),
-			CustomTemplates: json.RawMessage("[]"),
-			ActiveSession:   json.RawMessage("null"),
+			Sessions:        "[]",
+			CustomExercises: "[]",
+			CustomTemplates: "[]",
+			ActiveSession:   "null",
 			LastUpdated:     "",
 		}
 		return formatDebugHTML(emptyState, uuid)
 	}
 
-	// Unmarshal DynamoDB item to UserState
-	var state UserState
-	err = dynamodbattribute.UnmarshalMap(result.Item, &state)
+	// Unmarshal DynamoDB item - use flexible type to handle both binary and string
+	var dynamoState DynamoUserState
+	err = dynamodbattribute.UnmarshalMap(result.Item, &dynamoState)
 	if err != nil {
 		log.Printf("DynamoDB unmarshal error: %v", err)
 		return errorResponse(headers, 500, "Failed to parse state")
+	}
+
+	// Convert to UserState with string fields
+	state := UserState{
+		UUID:            dynamoState.UUID,
+		Sessions:        convertToString(dynamoState.Sessions),
+		CustomExercises: convertToString(dynamoState.CustomExercises),
+		CustomTemplates: convertToString(dynamoState.CustomTemplates),
+		ActiveSession:   convertToString(dynamoState.ActiveSession),
+		LastUpdated:     dynamoState.LastUpdated,
 	}
 
 	return formatDebugHTML(state, uuid)

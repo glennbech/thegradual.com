@@ -330,6 +330,17 @@
     "difficulty": "beginner"
   },
   {
+    "id": "legs-11",
+    "name": "Hip Thrust",
+    "category": "Legs",
+    "muscleGroup": "legs",
+    "description": "Upper back on bench, barbell across hips. Drive hips up by squeezing glutes, lower with control. Excellent for glute development.",
+    "primaryMuscles": ["Gluteus Maximus"],
+    "secondaryMuscles": ["Hamstrings", "Core Muscles"],
+    "equipment": "Barbell, Flat Bench",
+    "difficulty": "intermediate"
+  },
+  {
     "id": "shoulders-1",
     "name": "Overhead Press",
     "category": "Shoulders",
@@ -438,6 +449,17 @@
     "secondaryMuscles": ["Triceps Brachii", "Core Muscles"],
     "equipment": "Bodyweight",
     "difficulty": "intermediate"
+  },
+  {
+    "id": "shoulders-11",
+    "name": "Dumbbell Shoulder Press",
+    "category": "Shoulders",
+    "muscleGroup": "shoulders",
+    "description": "Seated or standing, press dumbbells from shoulder height to overhead, rotating palms forward. Lower with control.",
+    "primaryMuscles": ["Anterior Deltoids", "Lateral Deltoids"],
+    "secondaryMuscles": ["Triceps Brachii", "Upper Pectoralis", "Core Muscles"],
+    "equipment": "Dumbbells",
+    "difficulty": "beginner"
   },
   {
     "id": "arms-1",
@@ -550,6 +572,28 @@
     "difficulty": "intermediate"
   },
   {
+    "id": "arms-11",
+    "name": "Dumbbell Bicep Curl",
+    "category": "Arms",
+    "muscleGroup": "arms",
+    "description": "Stand with dumbbells, palms facing forward. Curl weights to shoulders keeping elbows stationary, lower with control.",
+    "primaryMuscles": ["Biceps Brachii"],
+    "secondaryMuscles": ["Brachialis", "Forearms"],
+    "equipment": "Dumbbells",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "arms-12",
+    "name": "Skull Crushers",
+    "category": "Arms",
+    "muscleGroup": "arms",
+    "description": "Lying on bench, hold barbell or dumbbells above face. Lower weight to forehead by bending elbows, extend back up focusing on triceps.",
+    "primaryMuscles": ["Triceps Brachii"],
+    "secondaryMuscles": ["Anterior Deltoids"],
+    "equipment": "Barbell or Dumbbells, Flat Bench",
+    "difficulty": "intermediate"
+  },
+  {
     "id": "core-1",
     "name": "Plank",
     "category": "Core",
@@ -658,5 +702,16 @@
     "secondaryMuscles": ["Obliques"],
     "equipment": "Bodyweight",
     "difficulty": "intermediate"
+  },
+  {
+    "id": "core-11",
+    "name": "Sit-Ups",
+    "category": "Core",
+    "muscleGroup": "core",
+    "description": "Lying on back with knees bent, curl torso up towards knees using abdominal muscles. Lower back down with control.",
+    "primaryMuscles": ["Rectus Abdominis"],
+    "secondaryMuscles": ["Hip Flexors", "Obliques"],
+    "equipment": "Bodyweight",
+    "difficulty": "beginner"
   }
 ]

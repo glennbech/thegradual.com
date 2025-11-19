@@ -2,13 +2,20 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Plus, Play, X, Clock, Target, Sparkles, Trash2, ChevronDown, ChevronUp, Dumbbell, Edit2 } from 'lucide-react'
 import { staggerContainer, staggerItem } from '../utils/animations'
-import { exerciseService, sessionService, templateService } from '../services/stateService'
 import { headingStyles, iconSizes } from '../utils/typography'
 import { getMuscleColor } from '../utils/design-system'
 import ExerciseCard from './ExerciseCard'
+import defaultExercises from '../data/exercises.json'
 import workoutTemplates from '../data/workoutTemplates.json'
+import useWorkoutStore from '../stores/workoutStore'
 
 export default function SessionPlanner({ onStartSession }) {
+  // Zustand store
+  const customTemplatesFromStore = useWorkoutStore((state) => state.getCustomTemplates())
+  const addCustomTemplate = useWorkoutStore((state) => state.addCustomTemplate)
+  const updateCustomTemplate = useWorkoutStore((state) => state.updateCustomTemplate)
+  const deleteCustomTemplate = useWorkoutStore((state) => state.deleteCustomTemplate)
+
   const [exercises, setExercises] = useState([])
   const [selectedExercises, setSelectedExercises] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -18,7 +25,6 @@ export default function SessionPlanner({ onStartSession }) {
   const [showAllTemplates, setShowAllTemplates] = useState(false) // Show only 3 templates initially
   const [showPersonalWorkouts, setShowPersonalWorkouts] = useState(true) // Collapse personal workouts
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(true) // Start with exercise library expanded
-  const [customTemplates, setCustomTemplates] = useState([])
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -34,34 +40,29 @@ export default function SessionPlanner({ onStartSession }) {
     frequency: ''
   })
 
+  // Use Zustand store data directly (no local state needed)
+  const customTemplates = customTemplatesFromStore
+
   useEffect(() => {
     loadExercises()
-    loadCustomTemplates()
   }, [])
 
   const loadExercises = async () => {
-    const data = await exerciseService.getAll()
+    // Load from Zustand store
+    const customExercises = useWorkoutStore.getState().getCustomExercises()
+    const data = [...defaultExercises, ...customExercises]
     setExercises(data)
-  }
-
-  const loadCustomTemplates = async () => {
-    const data = await templateService.getAllCustom()
-    setCustomTemplates(data)
   }
 
   const handleDeleteTemplate = async (templateId, e) => {
     e.stopPropagation()
 
-    // Optimistic UI update - remove immediately for instant feedback
-    setCustomTemplates(customTemplates.filter(t => t.id !== templateId))
-
-    // Then delete from storage in background
+    // Delete using Zustand (automatically persists to API)
     try {
-      await templateService.delete(templateId)
+      await deleteCustomTemplate(templateId)
     } catch (error) {
-      // If deletion fails, restore the template
       console.error('Failed to delete template:', error)
-      loadCustomTemplates()
+      alert('Failed to delete template. Please try again.')
     }
   }
 
@@ -256,18 +257,17 @@ export default function SessionPlanner({ onStartSession }) {
       // If overwriting an existing template, UPDATE it (preserve ID)
       const existingTemplate = customTemplates.find(t => t.name === templateForm.name)
       if (existingTemplate) {
-        await templateService.update(existingTemplate.id, {
+        await updateCustomTemplate(existingTemplate.id, {
           ...templateForm,
           exerciseIds,
         })
       } else {
-        // Create new template
-        await templateService.create({ ...templateForm, exerciseIds })
+        // Create new template using Zustand
+        await addCustomTemplate({ ...templateForm, exerciseIds })
       }
 
       setShowSaveTemplateModal(false)
       setShowOverwriteConfirm(false)
-      await loadCustomTemplates()
       setTemplateForm({
         name: '',
         description: '',

@@ -2,18 +2,20 @@ import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Downl
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { awsConfig } from '../config/aws';
+import useWorkoutStore from '../stores/workoutStore';
 
 export default function Profile() {
   const { user, identityId, isAuthenticated, signIn, signOut } = useAuth();
 
+  // Get data from Zustand store
+  const sessions = useWorkoutStore((state) => state.sessions);
+  const customExercises = useWorkoutStore((state) => state.customExercises);
+  const customTemplates = useWorkoutStore((state) => state.customTemplates);
+  const activeSession = useWorkoutStore((state) => state.activeSession);
+
   // Get localStorage stats for debug
   const getLocalStorageStats = () => {
     try {
-      const sessions = JSON.parse(localStorage.getItem('sessions') || '[]');
-      const customExercises = JSON.parse(localStorage.getItem('customExercises') || '[]');
-      const customTemplates = JSON.parse(localStorage.getItem('customTemplates') || '[]');
-      const activeSession = localStorage.getItem('activeSession');
-
       return {
         sessionsCount: sessions.length,
         customExercisesCount: customExercises.length,
@@ -55,10 +57,10 @@ export default function Profile() {
   // Download all user data as JSON
   const handleDownloadAllData = () => {
     const allData = {
-      sessions: JSON.parse(localStorage.getItem('sessions') || '[]'),
-      customExercises: JSON.parse(localStorage.getItem('customExercises') || '[]'),
-      customTemplates: JSON.parse(localStorage.getItem('customTemplates') || '[]'),
-      activeSession: JSON.parse(localStorage.getItem('activeSession') || 'null'),
+      sessions: sessions,
+      customExercises: customExercises,
+      customTemplates: customTemplates,
+      activeSession: activeSession,
       exportDate: new Date().toISOString(),
       user: user || null
     };

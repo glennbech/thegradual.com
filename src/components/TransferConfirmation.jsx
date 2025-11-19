@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, Check, X } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { setUserId } from '../utils/userManager'
-import StateManager from '../services/StateManager'
+import useWorkoutStore from '../stores/workoutStore'
 
 export default function TransferConfirmation({ transferUserId, onCancel, onSuccess }) {
   const [isTransferring, setIsTransferring] = useState(false)
@@ -13,14 +13,16 @@ export default function TransferConfirmation({ transferUserId, onCancel, onSucce
     setIsTransferring(true)
 
     try {
-      // Clear existing state
-      await StateManager.clearAll()
+      // Clear existing Zustand store cache
+      const clearCache = useWorkoutStore.getState().clearCache
+      clearCache()
 
       // Set new user ID
       setUserId(transferUserId)
 
-      // Re-initialize StateManager with new ID
-      await StateManager.init()
+      // Load data from API with new user ID
+      const loadFromAPI = useWorkoutStore.getState().loadFromAPI
+      await loadFromAPI()
 
       // Celebrate!
       confetti({
