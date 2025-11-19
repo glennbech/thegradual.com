@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy } from 'lucide-react'
+import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy, Activity } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { pageTransition } from './utils/animations'
 import SessionPlanner from './components/SessionPlanner'
@@ -8,6 +8,7 @@ import ExerciseLogger from './components/ExerciseLogger'
 import SessionHistory from './components/SessionHistory'
 import Profile from './components/Profile'
 import Progress from './components/Progress'
+import Analyze from './components/Analyze'
 import FloatingSessionIndicator from './components/FloatingSessionIndicator'
 import TransferConfirmation from './components/TransferConfirmation'
 import AuthButton from './components/AuthButton'
@@ -147,6 +148,7 @@ function AppContent() {
     { id: 'home', label: 'Work Out', icon: Plus },
     { id: 'history', label: 'History', icon: Calendar },
     { id: 'progress', label: 'Progress', icon: TrendingUp },
+    { id: 'analyze', label: 'Analyze', icon: Activity },
     { id: 'profile', label: 'Profile', icon: User }, // Replaced Health with Profile
   ]
 
@@ -236,6 +238,10 @@ function AppContent() {
 
             {currentView === 'progress' && (
               <Progress />
+            )}
+
+            {currentView === 'analyze' && (
+              <Analyze />
             )}
 
             {currentView === 'profile' && (
