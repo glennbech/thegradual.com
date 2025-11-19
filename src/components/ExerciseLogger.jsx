@@ -11,6 +11,8 @@ import {
   X,
   Info,
   Check,
+  Clock,
+  Dumbbell,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sessionService } from '../services/stateService';
@@ -110,6 +112,19 @@ export default function ExerciseLogger({
   };
 
   // Restore currentExerciseIndex from activeSession when it loads
+  // Debug logging for component lifecycle
+  useEffect(() => {
+    console.log('🔵 [ExerciseLogger] Component MOUNTED');
+    return () => {
+      console.log('🔵 [ExerciseLogger] Component UNMOUNTING');
+    };
+  }, []);
+
+  // Debug logging for activeSession changes
+  useEffect(() => {
+    console.log('🔵 [ExerciseLogger] activeSession changed:', activeSession);
+  }, [activeSession]);
+
   useEffect(() => {
     if (activeSession?.currentExerciseIndex !== undefined) {
       setCurrentExerciseIndex(activeSession.currentExerciseIndex);
@@ -143,20 +158,14 @@ export default function ExerciseLogger({
 
     const initSession = async () => {
       try {
-        console.log('=== ExerciseLogger: Initializing Session ===');
-        console.log('templateReference:', templateReference);
-        console.log('exercises:', exercises);
 
         // Get previous session data if template is specified
         let previousSession = null;
         if (templateReference?.templateId) {
-          console.log('Looking for previous session with templateId:', templateReference.templateId);
           previousSession = await sessionService.getPreviousSessionByTemplate(
             templateReference.templateId
           );
-          console.log('Previous session found:', previousSession);
         } else {
-          console.log('No templateReference provided - skipping previous session lookup');
         }
 
         // Create new session with exercises
@@ -167,9 +176,6 @@ export default function ExerciseLogger({
               (prevEx) => prevEx.id === ex.id
             );
 
-            console.log(`Exercise ${idx + 1} (${ex.name}):`);
-            console.log('  - Current exercise ID:', ex.id);
-            console.log('  - Previous exercise found:', prevExercise ? 'YES' : 'NO');
 
             // Pre-populate sets from previous session as PLANNED (not yet completed)
             const prePopulatedSets = prevExercise?.sets?.map((set) => ({
@@ -189,9 +195,6 @@ export default function ExerciseLogger({
 
             const initialSets = prePopulatedSets.length > 0 ? prePopulatedSets : defaultPlannedSets;
 
-            console.log('  - Pre-populated sets:', prePopulatedSets.length, 'sets');
-            console.log('  - Initial sets (with fallback):', initialSets.length, 'sets');
-            console.log('  - Sets detail:', initialSets);
 
             return {
               ...ex,
@@ -202,9 +205,7 @@ export default function ExerciseLogger({
           templateReference: templateReference || null,
         };
 
-        console.log('Creating new session with data:', newSession);
         const session = await sessionService.create(newSession);
-        console.log('Session created successfully:', session);
         setActiveSession(session);
         if (onSessionCreated) {
           onSessionCreated(session);
@@ -428,32 +429,56 @@ export default function ExerciseLogger({
   };
 
   const confirmCompleteWorkout = async () => {
+    console.log('🔵 [ExerciseLogger] confirmCompleteWorkout - START');
+    console.log('🔵 [ExerciseLogger] activeSession:', activeSession);
+    console.log('🔵 [ExerciseLogger] onComplete callback exists?', !!onComplete);
+
+    // Close the dialog first
+    setShowCompleteDialog(false);
+    console.log('🔵 [ExerciseLogger] Dialog closed');
+
     try {
+      // Store session ID before clearing
+      const sessionId = activeSession.id;
+      console.log('🔵 [ExerciseLogger] Stored session ID:', sessionId);
+
       // Celebrate workout completion!
+      console.log('🔵 [ExerciseLogger] Starting confetti celebration');
       celebrateWorkout();
 
-      // Complete the session (moves to history, clears active)
-      const completedSession = await sessionService.complete(activeSession.id);
+      // Complete the session (moves to history, clears active in StateManager)
+      console.log('🔵 [ExerciseLogger] Calling sessionService.complete with ID:', sessionId);
+      const completedSession = await sessionService.complete(sessionId);
+      console.log('🔵 [ExerciseLogger] Session completed successfully:', completedSession);
 
-      // Clear active session in local state
+      // CRITICAL: Clear active session in local state AFTER completing
+      console.log('🔵 [ExerciseLogger] Clearing activeSession in local state');
       setActiveSession(null);
+      console.log('🔵 [ExerciseLogger] activeSession cleared');
 
-      // Call parent callback to navigate to history with session ID
+      // Navigate immediately - confetti will continue running on the history page
+      console.log('🔵 [ExerciseLogger] Calling onComplete callback immediately');
       if (onComplete) {
+        console.log('🔵 [ExerciseLogger] Calling onComplete with:', {
+          exercises: completedSession.exercises,
+          sessionId: completedSession.id
+        });
         onComplete(completedSession.exercises, completedSession.id);
+        console.log('🔵 [ExerciseLogger] onComplete callback executed');
+      } else {
+        console.error('❌ [ExerciseLogger] onComplete callback is missing!');
       }
     } catch (error) {
-      console.error('Error completing workout:', error);
+      console.error('❌ [ExerciseLogger] Error completing workout:', error);
       alert('Error completing workout. Please try again.');
     }
   };
 
-  const handleSaveSession = () => {
+  const handleSaveSession = async () => {
     if (confirm('Save and exit this workout?')) {
-      sessionService.complete(activeSession.id).then(() => {
-        setActiveSession(null);
-        onComplete?.(activeSession.exercises);
-      });
+      const completedSession = await sessionService.complete(activeSession.id);
+      setActiveSession(null);
+      onComplete?.(completedSession.exercises, completedSession.id);
     }
   };
 
@@ -500,18 +525,62 @@ export default function ExerciseLogger({
       />
 
       <div className="space-y-4 pb-32">
-      {/* Simplified Top Bar: Just session progress */}
-      <div className="bg-white border-b border-mono-200 -mx-4 px-4 py-2">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-mono-500 uppercase tracking-wide">
-            {formatDuration(sessionTime)} • {totalSetsCompleted} sets
-          </span>
+      {/* Prominent Progress Bar */}
+      <div className="bg-mono-900 border-b-4 border-mono-900 -mx-4">
+        {/* Progress Bar Visual */}
+        <div className="h-2 bg-mono-700">
+          <motion.div
+            className="h-full bg-white"
+            initial={{ width: 0 }}
+            animate={{
+              width: `${((currentExerciseIndex + 1) / activeSession.exercises.length) * 100}%`
+            }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          />
+        </div>
+
+        {/* Stats Row */}
+        <div className="px-4 py-3 flex items-center justify-between">
+          {/* Time Elapsed */}
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-white" strokeWidth={2.5} />
+            <div>
+              <div className="text-xs text-white/60 uppercase tracking-wide">Time</div>
+              <div className="text-sm font-bold text-white tabular-nums">
+                {formatDuration(sessionTime)}
+              </div>
+            </div>
+          </div>
+
+          {/* Exercise Progress */}
+          <div className="flex items-center gap-2">
+            <Dumbbell className="w-4 h-4 text-white" strokeWidth={2.5} />
+            <div className="text-right">
+              <div className="text-xs text-white/60 uppercase tracking-wide">Exercises</div>
+              <div className="text-sm font-bold text-white tabular-nums">
+                {currentExerciseIndex + 1}/{activeSession.exercises.length}
+              </div>
+            </div>
+          </div>
+
+          {/* Sets Progress */}
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-white" strokeWidth={2.5} />
+            <div className="text-right">
+              <div className="text-xs text-white/60 uppercase tracking-wide">Sets</div>
+              <div className="text-sm font-bold text-white tabular-nums">
+                {totalSetsCompleted}
+              </div>
+            </div>
+          </div>
+
+          {/* Discard Button */}
           <motion.button
             onClick={handleDiscardSession}
-            className="text-mono-400 hover:text-mono-900"
+            className="text-white/60 hover:text-white ml-2"
             whileTap={{ scale: 0.95 }}
           >
-            <X className="w-4 h-4" />
+            <Trash2 className="w-5 h-5" strokeWidth={2.5} />
           </motion.button>
         </div>
       </div>
@@ -574,10 +643,10 @@ export default function ExerciseLogger({
       </div>
 
 
-      {/* Previous Session - Compact Banner */}
+      {/* Previous Session - Clean Banner */}
       {previousSessionData && previousSessionData.sets && previousSessionData.sets.length > 0 && (
-        <div className="px-4 py-3 bg-amber-50 border-2 border-amber-200">
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-900 mb-2 flex items-center gap-2">
+        <div className="px-4 py-3 bg-mono-50 border-2 border-mono-200">
+          <p className="text-xs font-bold uppercase tracking-widest text-mono-600 mb-2 flex items-center gap-2">
             <Trophy className="w-3 h-3" />
             Last Time: {previousSessionData.sets.length} sets
           </p>
@@ -585,11 +654,11 @@ export default function ExerciseLogger({
             {previousSessionData.sets.map((set, idx) => (
               <div
                 key={idx}
-                className="flex-shrink-0 px-3 py-1.5 bg-white border border-amber-300 text-xs"
+                className="flex-shrink-0 px-3 py-1.5 bg-white border-2 border-mono-900 text-xs"
               >
-                <span className="font-bold text-amber-900">{set.reps}</span>
+                <span className="font-bold text-mono-900">{set.reps}</span>
                 <span className="text-mono-500 mx-1">×</span>
-                <span className="font-bold text-amber-900">{set.weight}kg</span>
+                <span className="font-bold text-mono-900">{set.weight}kg</span>
               </div>
             ))}
           </div>
@@ -692,7 +761,7 @@ export default function ExerciseLogger({
                       className={`w-10 h-10 flex-shrink-0 border-2 flex items-center justify-center transition-colors ${
                         set.completed
                           ? 'bg-mono-900 border-mono-900'
-                          : 'bg-white border-mono-900 hover:border-cyan-500'
+                          : 'bg-white border-mono-900 hover:bg-mono-50'
                       }`}
                       type="button"
                     >

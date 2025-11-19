@@ -7,25 +7,44 @@
 AWS_REGION=us-east-2
 S3_WEBAPP_BUCKET=thegradual-webapp
 
+# Lambda directories
+LAMBDA_DIRS=lambda-user-state lambda-bff lambda-cognito-postconfirm lambda-pre-token-generation
+
 # Lambda targets
 deploy-lambda:
 	@echo "========================================"
-	@echo "Building and deploying Lambda function..."
+	@echo "Building and deploying all Lambda functions..."
 	@echo "========================================"
-	$(MAKE) -C lambda-user-state deploy
-	@echo "✓ Lambda function deployed!"
+	@for dir in $(LAMBDA_DIRS); do \
+		echo ""; \
+		echo "Deploying $$dir..."; \
+		$(MAKE) -C $$dir deploy || exit 1; \
+	done
+	@echo ""
+	@echo "✓ All Lambda functions deployed!"
 
 build-lambda:
-	@echo "Building Lambda function..."
-	$(MAKE) -C lambda-user-state build
+	@echo "Building all Lambda functions..."
+	@for dir in $(LAMBDA_DIRS); do \
+		echo "Building $$dir..."; \
+		$(MAKE) -C $$dir build || exit 1; \
+	done
+	@echo "✓ All Lambda functions built!"
 
 update-lambda:
-	@echo "Updating Lambda function code directly..."
-	$(MAKE) -C lambda-user-state update-lambda
+	@echo "Updating all Lambda function code directly..."
+	@for dir in $(LAMBDA_DIRS); do \
+		echo "Updating $$dir..."; \
+		$(MAKE) -C $$dir update-lambda || exit 1; \
+	done
+	@echo "✓ All Lambda functions updated!"
 
 clean-lambda:
-	@echo "Cleaning Lambda artifacts..."
-	$(MAKE) -C lambda-user-state clean
+	@echo "Cleaning all Lambda artifacts..."
+	@for dir in $(LAMBDA_DIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
+	@echo "✓ All Lambda artifacts cleaned!"
 
 # Webapp targets
 webapp-build:
@@ -63,7 +82,11 @@ deploy-all: deploy-lambda terraform-apply webapp-sync
 	@echo "========================================"
 	@echo "✓ Full deployment complete!"
 	@echo "========================================"
-	@echo "  - Lambda function built and uploaded"
+	@echo "  - Lambda functions built and uploaded:"
+	@echo "    * lambda-user-state (API backend)"
+	@echo "    * lambda-bff (Auth backend)"
+	@echo "    * lambda-cognito-postconfirm (User setup)"
+	@echo "    * lambda-pre-token-generation (JWT claims)"
 	@echo "  - Terraform applied"
 	@echo "  - Webapp deployed to S3"
 	@echo ""
@@ -84,11 +107,17 @@ help:
 	@echo "TheGradual.com Makefile"
 	@echo "======================="
 	@echo ""
-	@echo "Lambda targets:"
-	@echo "  make deploy-lambda   - Build and deploy Lambda function to S3"
-	@echo "  make build-lambda    - Build Lambda function only"
-	@echo "  make update-lambda   - Update Lambda function code directly (bypass Terraform)"
-	@echo "  make clean-lambda    - Clean Lambda build artifacts"
+	@echo "Lambda targets (builds all 4 functions):"
+	@echo "  make deploy-lambda   - Build and deploy ALL Lambda functions to S3"
+	@echo "  make build-lambda    - Build ALL Lambda functions only"
+	@echo "  make update-lambda   - Update ALL Lambda function code directly (bypass Terraform)"
+	@echo "  make clean-lambda    - Clean ALL Lambda build artifacts"
+	@echo ""
+	@echo "Lambda functions:"
+	@echo "  - lambda-user-state            (User data API)"
+	@echo "  - lambda-bff                   (Auth backend-for-frontend)"
+	@echo "  - lambda-cognito-postconfirm   (Post-signup trigger)"
+	@echo "  - lambda-pre-token-generation  (JWT claims trigger)"
 	@echo ""
 	@echo "Webapp targets:"
 	@echo "  make webapp-build    - Build webapp (npm run build)"
@@ -101,7 +130,7 @@ help:
 	@echo "  make terraform-destroy - Destroy all Terraform resources"
 	@echo ""
 	@echo "Full deployment:"
-	@echo "  make deploy-all      - Deploy everything (Lambda + Terraform + Webapp)"
+	@echo "  make deploy-all      - Deploy everything (Lambdas + Terraform + Webapp)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean           - Clean all build artifacts"

@@ -56,11 +56,9 @@ export async function fetchUserState() {
       !data.activeSession;
 
     if (isEmpty) {
-      console.log('User state is empty (new user or no data)');
       return null;
     }
 
-    console.log('User state fetched from API:', data);
     return data;
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -114,7 +112,6 @@ export async function saveUserState(state) {
     }
 
     const data = await response.json();
-    console.log('User state saved to API:', data);
     return data;
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -165,7 +162,6 @@ export async function loadFromAPI() {
     localStorage.removeItem('gymbot_active_session');
   }
 
-  console.log('User state loaded from API to localStorage');
   return true;
 }
 
@@ -186,7 +182,6 @@ export async function checkAPIHealth() {
     clearTimeout(timeoutId);
     return true;
   } catch (error) {
-    console.warn('API health check failed:', error);
     return false;
   }
 }

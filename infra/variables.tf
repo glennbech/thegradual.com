@@ -39,3 +39,21 @@ variable "api_burst_limit" {
   type        = number
   default     = 10
 }
+
+variable "google_client_id" {
+  description = "Google OAuth client ID"
+  type        = string
+  default     = ""
+}
+
+variable "cognito_client_id" {
+  description = "Cognito User Pool Client ID (pre-created)"
+  type        = string
+  default     = "77efo2uje76pge8egkihhj8jvm"
+}
+
+variable "cognito_callback_urls" {
+  description = "Cognito OAuth callback URLs"
+  type        = list(string)
+  default     = ["https://thegradual.com", "https://www.thegradual.com", "http://localhost:5555"]
+}

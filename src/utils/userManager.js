@@ -24,18 +24,54 @@ function generateUUID() {
 }
 
 /**
+ * Parse JWT token to extract payload
+ * @param {string} token - JWT token
+ * @returns {Object|null} Parsed payload or null
+ */
+function parseJWT(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error parsing JWT:', error);
+    return null;
+  }
+}
+
+/**
  * Get or create user UUID
+ * Priority: Cognito sub > localStorage UUID > new UUID
  * @returns {string} User UUID
  */
 export function getUserId() {
-  // Check if UUID already exists in localStorage
+  // PRIORITY 1: Check if user is authenticated with Cognito
+  const idToken = localStorage.getItem('idToken');
+
+  if (idToken) {
+    try {
+      const payload = parseJWT(idToken);
+      if (payload?.sub) {
+        // Use Cognito sub as user ID for authenticated users
+        return payload.sub;
+      }
+    } catch (error) {
+    }
+  }
+
+  // PRIORITY 2: Check if anonymous UUID already exists in localStorage
   let userId = localStorage.getItem(USER_ID_KEY);
 
   if (!userId) {
-    // Generate new UUID for first-time user
+    // PRIORITY 3: Generate new UUID for first-time anonymous user
     userId = generateUUID();
     localStorage.setItem(USER_ID_KEY, userId);
-    console.log('New user created with ID:', userId);
   }
 
   return userId;
@@ -47,7 +83,6 @@ export function getUserId() {
  */
 export function clearUserId() {
   localStorage.removeItem(USER_ID_KEY);
-  console.log('User ID cleared');
 }
 
 /**
@@ -70,6 +105,5 @@ export function setUserId(newUserId) {
   }
 
   localStorage.setItem(USER_ID_KEY, newUserId);
-  console.log('User ID set to:', newUserId);
   return newUserId;
 }

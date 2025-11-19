@@ -13,20 +13,25 @@ import {
   Sparkles,
   X,
   Play,
+  Clock,
+  MoreHorizontal,
 } from 'lucide-react';
 import { staggerContainer, staggerItem, scaleIn } from '../utils/animations';
 import { sessionService, templateService } from '../services/stateService';
 import { headingStyles, iconSizes } from '../utils/typography';
 import SessionTimeline from './SessionTimeline';
 import { getMuscleColor } from '../utils/design-system';
+import WorkoutCalendar from './WorkoutCalendar';
 
 export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, onClearExpandedSession }) {
   const [sessions, setSessions] = useState([]);
   const [expandedSession, setExpandedSession] = useState(null);
   const [deletingSession, setDeletingSession] = useState(null);
+  const [sessionToDelete, setSessionToDelete] = useState(null); // For confirmation
   const [editingName, setEditingName] = useState(null);
   const [editedName, setEditedName] = useState('');
   const [makingTemplate, setMakingTemplate] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(5);
   const [templateForm, setTemplateForm] = useState({
     name: '',
     description: '',
@@ -55,9 +60,19 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     setSessions(data);
   };
 
-  const handleDeleteSession = async (sessionId, e) => {
+  const handleDeleteSession = (sessionId, e) => {
     e.stopPropagation();
+    // Find the session to show in confirmation
+    const session = sessions.find(s => s.id === sessionId);
+    setSessionToDelete(session);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+
+    const sessionId = sessionToDelete.id;
     setDeletingSession(sessionId);
+    setSessionToDelete(null); // Close modal
 
     setTimeout(async () => {
       await sessionService.delete(sessionId);
@@ -147,28 +162,12 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     setExpandedSession(expandedSession === sessionId ? null : sessionId);
   };
 
-  if (sessions.length === 0) {
-    return (
-      <motion.div
-        {...scaleIn}
-        className="flex flex-col items-center justify-center h-96 text-center"
-      >
-        <motion.div
-          animate={{ rotate: [0, 10, -10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="bg-mono-900 p-6 mb-4"
-        >
-          <Trophy className="w-16 h-16 text-white" />
-        </motion.div>
-        <h2 className="text-2xl font-bold text-mono-900 mb-2 uppercase tracking-tight">
-          No workouts yet!
-        </h2>
-        <p className="text-mono-500 text-sm uppercase tracking-wide">
-          Complete your first session to see it here
-        </p>
-      </motion.div>
-    );
-  }
+  const visibleSessions = sessions.slice(0, visibleCount);
+  const hasMore = visibleCount < sessions.length;
+
+  const handleLoadMore = () => {
+    setVisibleCount(prev => prev + 5);
+  };
 
   return (
     <div className="space-y-4">
@@ -186,16 +185,51 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
         </p>
       </motion.div>
 
-      {/* Sessions List */}
+      {/* Workout Calendar */}
       <motion.div
-        variants={staggerContainer}
-        initial="initial"
-        animate="animate"
-        className="space-y-3"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
       >
-        {sessions.map((session) => {
+        <WorkoutCalendar sessions={sessions} />
+      </motion.div>
+
+      {/* Empty State */}
+      {sessions.length === 0 && (
+        <motion.div
+          {...scaleIn}
+          className="flex flex-col items-center justify-center h-64 text-center"
+        >
+          <motion.div
+            animate={{ rotate: [0, 10, -10, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="bg-mono-900 p-6 mb-4"
+          >
+            <Trophy className="w-16 h-16 text-white" />
+          </motion.div>
+          <h2 className="text-2xl font-bold text-mono-900 mb-2 uppercase tracking-tight">
+            No workouts yet!
+          </h2>
+          <p className="text-mono-500 text-sm uppercase tracking-wide">
+            Complete your first session to see it here
+          </p>
+        </motion.div>
+      )}
+
+      {/* Sessions List */}
+      {sessions.length > 0 && (
+        <motion.div
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+          className="space-y-3"
+        >
+          {visibleSessions.map((session) => {
           const stats = calculateStats(session);
           const isExpanded = expandedSession === session.id;
+
+          // Get muscle groups from exercises
+          const muscleGroups = [...new Set(session.exercises.map(ex => ex.category))].filter(Boolean);
 
           return (
             <motion.div
@@ -211,183 +245,132 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                     }
                   : {}
               }
-              className="bg-white border-2 border-mono-900 overflow-hidden"
+              className="bg-white border-2 border-mono-900 overflow-hidden hover:border-mono-700 transition-colors relative cursor-pointer"
+              onClick={() => toggleExpand(session.id)}
             >
-              {/* Session Header */}
-              <div className="relative">
-                <div
-                  onClick={(e) => handleEditName(session, e)}
-                  className="w-full p-4 text-left hover:bg-mono-50 transition-colors cursor-pointer"
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleEditName(session, e);
-                    }
-                  }}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="bg-mono-900 p-2">
-                          <Calendar className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          {editingName === session.id ? (
-                            <div
-                              className="flex items-center gap-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="text"
-                                value={editedName}
-                                onChange={(e) => setEditedName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleSaveName(session.id, e);
-                                  if (e.key === 'Escape') setEditingName(null);
-                                }}
-                                placeholder="Workout name..."
-                                className="flex-1 px-2 py-1 text-sm border-2 border-mono-900 focus:outline-none font-bold text-mono-900 bg-white"
-                                autoFocus
-                              />
-                              <motion.button
-                                whileTap={{ scale: 0.9 }}
-                                onClick={(e) => handleSaveName(session.id, e)}
-                                className="text-mono-900 hover:text-mono-700 p-1"
-                              >
-                                <Check className="w-4 h-4" />
-                              </motion.button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 group">
-                              <div className="min-w-0 flex-1">
-                                {session.name && (
-                                  <h3 className={`${headingStyles.h4} truncate`}>
-                                    {session.name}
-                                  </h3>
-                                )}
-                                {/* Template Badge */}
-                                {session.templateReference && (
-                                  <div className="flex items-center gap-1.5 mt-1">
-                                    <span
-                                      className={`text-xs px-2 py-0.5 border font-semibold uppercase ${
-                                        session.templateReference.templateType === 'built-in'
-                                          ? 'bg-white text-mono-900 border-mono-900'
-                                          : 'bg-mono-900 text-white border-mono-900'
-                                      }`}
-                                    >
-                                      {session.templateReference.templateName}
-                                    </span>
-                                    {session.templateReference.isModified && (
-                                      <span className="text-xs text-mono-500 font-semibold uppercase">
-                                        (Modified)
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                <p className="text-xs text-mono-900 font-medium mt-1">
-                                  {formatDate(session.completedAt || session.createdAt)}
-                                </p>
-                                <p className="text-xs text-mono-500 uppercase">
-                                  {session.exercises.length} exercises
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+              {/* Black Header Bar */}
+              <div className="bg-mono-900 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    {session.templateReference ? (
+                      <h4 className="text-white font-bold text-lg uppercase tracking-tight truncate">
+                        {session.templateReference.templateName}
+                        {session.templateReference.isModified && (
+                          <span className="text-mono-400 text-sm ml-2">(Modified)</span>
+                        )}
+                      </h4>
+                    ) : (
+                      <h4 className="text-white font-bold text-lg uppercase tracking-tight">
+                        {formatDate(session.completedAt || session.createdAt)}
+                      </h4>
+                    )}
+                  </div>
 
-                      {/* Quick Stats */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-mono-50 border border-mono-200 p-2">
-                          <p className="text-xs text-mono-500 uppercase tracking-wide mb-1">
-                            Sets
-                          </p>
-                          <p className="text-lg font-bold text-mono-900 tabular-nums">
-                            {stats.totalSets}
-                          </p>
-                        </div>
-                        <div className="bg-mono-50 border border-mono-200 p-2">
-                          <p className="text-xs text-mono-500 uppercase tracking-wide mb-1">
-                            Reps
-                          </p>
-                          <p className="text-lg font-bold text-mono-900 tabular-nums">
-                            {stats.totalReps}
-                          </p>
-                        </div>
-                        <div className="bg-mono-50 border border-mono-200 p-2">
-                          <p className="text-xs text-mono-500 uppercase tracking-wide mb-1">
-                            Volume
-                          </p>
-                          <p className="text-lg font-bold text-mono-900 tabular-nums">
-                            {stats.totalWeight.toFixed(0)}kg
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                  {/* Subtle expansion indicator */}
+                  <motion.div
+                    animate={{ rotate: isExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-white/60"
+                  >
+                    <ChevronDown className="w-5 h-5" strokeWidth={2} />
+                  </motion.div>
+                </div>
+              </div>
 
-                    <div className="flex flex-col items-end gap-2 ml-3">
-                      {/* Primary Action: WORK OUT! */}
-                      <motion.button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDoItAgain && onDoItAgain(session.exercises);
-                        }}
-                        whileTap={{ scale: 0.98 }}
-                        className="bg-mono-900 hover:bg-mono-800 text-white px-6 py-3 font-bold text-sm uppercase tracking-wide flex items-center gap-2 transition-colors"
+              {/* Card Body */}
+              <div className="p-6">
+                {/* Date/Time (if using template) */}
+                {session.templateReference && (
+                  <p className="text-sm text-mono-600 mb-4">
+                    {formatDate(session.completedAt || session.createdAt)}
+                  </p>
+                )}
+
+                {/* Muscle Groups */}
+                {muscleGroups.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {muscleGroups.map(group => (
+                      <span
+                        key={group}
+                        className="px-2 py-1 text-xs font-bold uppercase tracking-wide border-2 border-mono-900 text-mono-900"
+                        style={{ borderColor: getMuscleColor(group), color: getMuscleColor(group) }}
                       >
-                        <Play className="w-4 h-4" fill="white" />
-                        WORK OUT!
-                      </motion.button>
+                        {group}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-                      {/* Secondary Actions: Inline Buttons */}
-                      <div className="flex items-center gap-1">
-                        <motion.button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMakeTemplate(session, e);
-                          }}
-                          whileTap={{ scale: 0.9 }}
-                          className="text-mono-500 hover:text-mono-900 p-2 hover:bg-mono-100 transition-colors rounded"
-                          title="Make Template"
-                        >
-                          <Sparkles className="w-4 h-4" />
-                        </motion.button>
-
-                        <motion.button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteSession(session.id, e);
-                          }}
-                          whileTap={{ scale: 0.9 }}
-                          className="text-mono-500 hover:text-red-600 p-2 hover:bg-red-50 transition-colors rounded"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </motion.button>
-
-                        {/* Expand/Collapse Chevron */}
-                        <motion.button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleExpand(session.id);
-                          }}
-                          whileTap={{ scale: 0.9 }}
-                          className="text-mono-500 hover:text-mono-900 p-2 transition-colors rounded"
-                          title={isExpanded ? "Collapse" : "Expand"}
-                        >
-                          <motion.div
-                            animate={{ rotate: isExpanded ? 180 : 0 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <ChevronDown className="w-5 h-5" />
-                          </motion.div>
-                        </motion.button>
-                      </div>
-                    </div>
+                {/* Quick Stats Grid */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="bg-mono-50 border border-mono-200 p-3 text-center">
+                    <p className="text-xs text-mono-500 uppercase tracking-wide mb-1">
+                      Sets
+                    </p>
+                    <p className="text-xl font-bold text-mono-900 tabular-nums">
+                      {stats.totalSets}
+                    </p>
+                  </div>
+                  <div className="bg-mono-50 border border-mono-200 p-3 text-center">
+                    <p className="text-xs text-mono-500 uppercase tracking-wide mb-1">
+                      Reps
+                    </p>
+                    <p className="text-xl font-bold text-mono-900 tabular-nums">
+                      {stats.totalReps}
+                    </p>
+                  </div>
+                  <div className="bg-mono-50 border border-mono-200 p-3 text-center">
+                    <p className="text-xs text-mono-500 uppercase tracking-wide mb-1">
+                      Volume
+                    </p>
+                    <p className="text-xl font-bold text-mono-900 tabular-nums">
+                      {stats.totalWeight.toFixed(0)}
+                    </p>
                   </div>
                 </div>
+
+                {/* Metadata Row - matches SessionPlanner style */}
+                <div className="flex items-center justify-between border-t-2 border-mono-200 pt-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-mono-600" strokeWidth={2} />
+                    <span className="font-bold text-base text-mono-900">
+                      {new Date(session.completedAt || session.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="w-px h-6 bg-mono-300" />
+                  <div className="flex items-center gap-2">
+                    <Dumbbell className="w-5 h-5 text-mono-600" strokeWidth={2} />
+                    <span className="font-bold text-base text-mono-900">{session.exercises.length} ex</span>
+                  </div>
+                  <div className="w-px h-6 bg-mono-300" />
+                  <motion.button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDoItAgain && onDoItAgain(session.exercises);
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center gap-1.5 text-mono-600 hover:text-mono-900 transition-colors text-sm font-medium uppercase tracking-wide"
+                    title="Do this workout again"
+                  >
+                    <Play className="w-4 h-4" fill="currentColor" />
+                    Again
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Delete button in top-right */}
+              <div className="absolute top-2 right-2">
+                <motion.button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteSession(session.id, e);
+                  }}
+                  whileTap={{ scale: 0.9 }}
+                  className="p-1.5 bg-white/80 hover:bg-white text-mono-600 hover:text-red-600 transition-colors"
+                  title="Delete session"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </motion.button>
               </div>
 
               {/* Expanded Details */}
@@ -537,6 +520,24 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
           );
         })}
       </motion.div>
+      )}
+
+      {/* Load More Button */}
+      {hasMore && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex justify-center pt-4"
+        >
+          <motion.button
+            onClick={handleLoadMore}
+            whileTap={{ scale: 0.98 }}
+            className="bg-white border-2 border-mono-900 text-mono-900 px-8 py-3 font-bold text-sm uppercase tracking-wide hover:bg-mono-900 hover:text-white transition-colors"
+          >
+            Load More Sessions
+          </motion.button>
+        </motion.div>
+      )}
 
       {/* Make Template Modal */}
       <AnimatePresence>
@@ -684,6 +685,65 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
               </form>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {sessionToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+            onClick={() => setSessionToDelete(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white border-2 border-mono-900 max-w-md w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-red-600 text-white p-4 flex items-center justify-between">
+                <h3 className="text-lg font-bold uppercase tracking-wide">
+                  Delete Workout?
+                </h3>
+                <button
+                  onClick={() => setSessionToDelete(null)}
+                  className="hover:opacity-70 transition-opacity"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <p className="text-mono-700">
+                  This action cannot be undone.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="p-4 border-t border-mono-200 flex gap-3">
+                <motion.button
+                  onClick={() => setSessionToDelete(null)}
+                  className="flex-1 h-12 bg-mono-200 text-mono-900 font-bold uppercase tracking-wide text-sm hover:bg-mono-300 transition-colors"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  CANCEL
+                </motion.button>
+                <motion.button
+                  onClick={confirmDeleteSession}
+                  className="flex-1 h-12 bg-red-600 text-white font-bold uppercase tracking-wide text-sm hover:opacity-90 transition-opacity"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  DELETE
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

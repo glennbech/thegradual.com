@@ -96,15 +96,55 @@ output "api_certificate_arn" {
   value       = aws_acm_certificate.api.arn
 }
 
+# Cognito outputs
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  value       = aws_cognito_user_pool.this.id
+}
+
+output "cognito_user_pool_arn" {
+  description = "Cognito User Pool ARN"
+  value       = aws_cognito_user_pool.this.arn
+}
+
+output "cognito_user_pool_endpoint" {
+  description = "Cognito User Pool endpoint"
+  value       = aws_cognito_user_pool.this.endpoint
+}
+
+output "cognito_user_pool_domain" {
+  description = "Cognito User Pool domain (for Hosted UI)"
+  value       = "${aws_cognito_user_pool_domain.this.domain}.auth.${data.aws_region.current.name}.amazoncognito.com"
+}
+
+output "cognito_server_client_id" {
+  description = "Cognito User Pool Server Client ID (used by both frontend and BFF)"
+  value       = aws_cognito_user_pool_client.server.id
+}
+
+output "cognito_identity_pool_id" {
+  description = "Cognito Identity Pool ID"
+  value       = aws_cognito_identity_pool.this.id
+}
+
+output "bff_lambda_url" {
+  description = "BFF Lambda Function URL"
+  value       = aws_lambda_function_url.bff.function_url
+}
+
 # Summary output
 output "deployment_summary" {
   description = "Deployment summary"
   value = {
-    webapp_url       = "https://${var.domain_name}"
-    api_url          = "https://${var.api_domain_name}/api/{uuid}"
-    lambda_function  = aws_lambda_function.user_state.function_name
-    dynamodb_table   = aws_dynamodb_table.user_states.name
-    s3_webapp_bucket = aws_s3_bucket.webapp.bucket
-    s3_lambda_bucket = local.lambda_artifacts_bucket
+    webapp_url               = "https://${var.domain_name}"
+    api_url                  = "https://${var.api_domain_name}/api/{uuid}"
+    lambda_function          = aws_lambda_function.user_state.function_name
+    dynamodb_table           = aws_dynamodb_table.user_states.name
+    s3_webapp_bucket         = aws_s3_bucket.webapp.bucket
+    s3_lambda_bucket         = local.lambda_artifacts_bucket
+    cognito_user_pool_id     = aws_cognito_user_pool.this.id
+    cognito_identity_pool_id = aws_cognito_identity_pool.this.id
+    cognito_client_id        = aws_cognito_user_pool_client.server.id # Used by both frontend and BFF
+    bff_lambda_url           = aws_lambda_function_url.bff.function_url
   }
 }

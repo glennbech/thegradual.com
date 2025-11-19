@@ -54,13 +54,11 @@ class StateManager {
     // Monitor online/offline status
     window.addEventListener('online', () => {
       this.isOnline = true;
-      console.log('StateManager: Online - syncing pending changes');
       this.forceSyncToAPI();
     });
 
     window.addEventListener('offline', () => {
       this.isOnline = false;
-      console.log('StateManager: Offline - using cache');
     });
 
     StateManager.instance = this;
@@ -84,7 +82,6 @@ class StateManager {
       return this.state;
     }
 
-    console.log('StateManager: Initializing...');
 
     // Always load from cache first (instant)
     this.loadFromCache();
@@ -96,7 +93,6 @@ class StateManager {
         const apiState = await fetchUserState();
 
         if (apiState) {
-          console.log('StateManager: Loaded from API, updating state');
           this.state = {
             sessions: apiState.sessions || [],
             activeSession: apiState.activeSession || null,
@@ -113,14 +109,11 @@ class StateManager {
           this.notifyListeners('customExercises');
           this.notifyListeners('customTemplates');
         } else {
-          console.log('StateManager: No API data found, using cache');
         }
       } catch (error) {
-        console.warn('StateManager: API load failed, continuing with cache:', error);
         // Cache is already loaded, so we're OK
       }
     } else {
-      console.log('StateManager: Offline, using cache only');
     }
 
     return this.state;
@@ -135,7 +128,6 @@ class StateManager {
       this.state.activeSession = JSON.parse(localStorage.getItem(CACHE_KEYS.ACTIVE_SESSION) || 'null');
       this.state.customExercises = JSON.parse(localStorage.getItem(CACHE_KEYS.CUSTOM_EXERCISES) || '[]');
       this.state.customTemplates = JSON.parse(localStorage.getItem(CACHE_KEYS.CUSTOM_TEMPLATES) || '[]');
-      console.log('StateManager: Loaded from cache');
     } catch (error) {
       console.error('StateManager: Cache load failed:', error);
       // Reset to defaults if cache is corrupted
@@ -179,7 +171,6 @@ class StateManager {
 
     // If offline, just return success (cache is updated)
     if (!this.isOnline) {
-      console.log('StateManager: Offline - saved to cache only');
       return Promise.resolve();
     }
 
@@ -207,14 +198,11 @@ class StateManager {
    */
   async executeSave() {
     if (!this.isOnline) {
-      console.log('StateManager: Offline - save queued for later');
       return true;
     }
 
     try {
-      console.log('StateManager: Saving to API...');
       await saveUserState(this.state);
-      console.log('StateManager: API save successful');
       return true;
     } catch (error) {
       console.error('StateManager: API save failed (cache already updated):', error);
@@ -285,7 +273,8 @@ class StateManager {
     }
 
     this.notifyListeners('sessions');
-    await this.saveToAPI();
+    // Save immediately without debounce for completed sessions (critical operation)
+    await this.saveToAPI(true);
 
     return session;
   }
@@ -367,7 +356,8 @@ class StateManager {
 
     this.state.activeSession = null;
     this.notifyListeners('activeSession');
-    await this.saveToAPI();
+    // Save immediately without debounce for clearing active session (critical operation)
+    await this.saveToAPI(true);
 
     return null;
   }
@@ -531,7 +521,6 @@ class StateManager {
     this.listeners.clear();
 
     this.initialized = false;
-    console.log('StateManager: All data cleared');
   }
 }
 

@@ -157,9 +157,16 @@ export const sessionService = {
    * Complete active session (move to history)
    */
   async complete(id) {
+    console.log('🟡 [sessionService] complete - START');
+    console.log('🟡 [sessionService] Requested session ID:', id);
+
     const activeSession = await StateManager.getActiveSession();
+    console.log('🟡 [sessionService] Active session retrieved:', activeSession);
 
     if (!activeSession || activeSession.id !== id) {
+      console.error('❌ [sessionService] No matching active session!');
+      console.error('❌ [sessionService] activeSession:', activeSession);
+      console.error('❌ [sessionService] requested id:', id);
       throw new Error('No matching active session to complete');
     }
 
@@ -170,13 +177,19 @@ export const sessionService = {
       endTime: new Date().toISOString(),
       completedAt: new Date().toISOString(),
     };
+    console.log('🟡 [sessionService] Created completedSession:', completedSession);
 
     // Add to sessions history
+    console.log('🟡 [sessionService] Adding session to history...');
     await StateManager.addSession(completedSession);
+    console.log('🟡 [sessionService] Session added to history');
 
     // Clear active session
+    console.log('🟡 [sessionService] Clearing active session from StateManager...');
     await StateManager.clearActiveSession();
+    console.log('🟡 [sessionService] Active session cleared from StateManager');
 
+    console.log('🟡 [sessionService] complete - COMPLETE, returning:', completedSession);
     return completedSession;
   },
 
@@ -211,27 +224,17 @@ export const sessionService = {
    * Get the previous session that used a specific template
    */
   async getPreviousSessionByTemplate(templateId) {
-    console.log('=== sessionService.getPreviousSessionByTemplate ===');
-    console.log('Looking for templateId:', templateId);
 
     const sessions = await StateManager.getSessions();
-    console.log('Total sessions in history:', sessions.length);
-    console.log('All sessions:', sessions);
 
     const templateSessions = sessions
       .filter(s => {
         const isCompleted = s.status === 'completed';
         const hasTemplateRef = s.templateReference?.templateId === templateId;
-        console.log(`Session ${s.id}:`);
-        console.log('  - Status:', s.status, '(completed?', isCompleted, ')');
-        console.log('  - Template ref:', s.templateReference);
-        console.log('  - Matches templateId?', hasTemplateRef);
         return isCompleted && hasTemplateRef;
       })
       .sort((a, b) => new Date(b.completedAt || b.endTime) - new Date(a.completedAt || a.endTime));
 
-    console.log('Matching template sessions:', templateSessions.length);
-    console.log('Most recent session:', templateSessions[0] || 'NONE');
 
     return templateSessions[0] || null;
   },

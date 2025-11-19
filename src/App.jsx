@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Home, Calendar, Dumbbell, Plus, Activity, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy } from 'lucide-react'
+import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { pageTransition } from './utils/animations'
 import SessionPlanner from './components/SessionPlanner'
 import ExerciseLogger from './components/ExerciseLogger'
 import SessionHistory from './components/SessionHistory'
-import HealthMetrics from './components/HealthMetrics'
+import Profile from './components/Profile'
 import Progress from './components/Progress'
 import FloatingSessionIndicator from './components/FloatingSessionIndicator'
 import TransferConfirmation from './components/TransferConfirmation'
+import AuthButton from './components/AuthButton'
+import WelcomeOnboardingModal from './components/WelcomeOnboardingModal'
+import { AuthProvider } from './contexts/AuthContext'
 import { useActiveSession, useSyncStatus } from './hooks/useStateManager'
 import { initializeState } from './services/stateService'
 import { getUserId } from './utils/userManager'
@@ -31,13 +34,17 @@ function App() {
   // Check if synced recently (within last 5 seconds)
   const isSynced = lastSync && (Date.now() - lastSync.getTime() < 5000)
 
+  // Debug logging for view changes
+  useEffect(() => {
+    console.log('🟢 [App] currentView changed to:', currentView);
+  }, [currentView]);
+
   // Check for transfer URL parameter on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const userIdParam = urlParams.get('userId')
 
     if (userIdParam) {
-      console.log('Transfer detected:', userIdParam)
       setTransferUserId(userIdParam)
     }
   }, [])
@@ -47,7 +54,6 @@ function App() {
     const initApp = async () => {
       try {
         await initializeState()
-        console.log('StateManager initialized successfully')
       } catch (error) {
         console.error('Failed to initialize StateManager:', error)
       } finally {
@@ -93,21 +99,33 @@ function App() {
   }
 
   const handleCompleteSession = (completedExercises, sessionId) => {
+    console.log('🟢 [App] handleCompleteSession - START');
+    console.log('🟢 [App] completedExercises:', completedExercises);
+    console.log('🟢 [App] sessionId:', sessionId);
+    console.log('🟢 [App] currentView BEFORE:', currentView);
+    console.log('🟢 [App] activeSession BEFORE:', activeSession);
+
     // Keep exercises for "do it again" functionality
     if (completedExercises) {
+      console.log('🟢 [App] Setting selectedExercises');
       setSelectedExercises(completedExercises)
     }
 
     // Store the completed session ID to auto-expand in history
     if (sessionId) {
+      console.log('🟢 [App] Setting completedSessionId:', sessionId);
       setCompletedSessionId(sessionId)
     }
 
     // Clear active session in App state (should already be null from StateManager)
+    console.log('🟢 [App] Clearing activeSession in App state');
     setActiveSession(null)
 
+    console.log('🟢 [App] Changing view to history');
     setCurrentView('history')
+    console.log('🟢 [App] Pushing history state');
     window.history.pushState({ view: 'history' }, '', window.location.pathname)
+    console.log('🟢 [App] handleCompleteSession - COMPLETE');
   }
 
   const handleDoItAgain = (exercises) => {
@@ -123,10 +141,8 @@ function App() {
 
   const handleCloseSession = async () => {
     // Confirmation is now handled in FloatingSessionIndicator modal
-    console.log('handleCloseSession: Clearing active session...')
     try {
       await clearActiveSession()
-      console.log('handleCloseSession: Active session cleared successfully')
       setCurrentView('home')
       window.history.pushState({ view: 'home' }, '', window.location.pathname)
     } catch (error) {
@@ -154,7 +170,7 @@ function App() {
     { id: 'home', label: 'Work Out', icon: Plus },
     { id: 'history', label: 'History', icon: Calendar },
     { id: 'progress', label: 'Progress', icon: TrendingUp },
-    { id: 'health', label: 'Health', icon: Activity }, // All the way to the right
+    { id: 'profile', label: 'Profile', icon: User }, // Replaced Health with Profile
   ]
 
   // Show loading screen while initializing
@@ -175,78 +191,38 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-mono-50 pb-16">
-      {/* Header */}
-      <motion.header
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="border-b border-mono-200 bg-white sticky top-0 z-20"
-      >
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <motion.button
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => {
-                setCurrentView('home')
-                setSelectedExercises([])
-                setTemplateReference(null)
-                setSessionPlannerKey(prev => prev + 1) // Force SessionPlanner to remount
-                window.history.pushState({ view: 'home' }, '', window.location.pathname)
-              }}
-            >
-              <Dumbbell size={40} className="text-mono-900" strokeWidth={1.5} />
-              <div>
-                <h1 className="text-3xl font-bold text-mono-900 tracking-tight">
-                  thegradual.com
+    <AuthProvider>
+      <div className="min-h-screen bg-mono-50 pb-16">
+        {/* Header */}
+        <motion.header
+          initial={{ y: -100 }}
+          animate={{ y: 0 }}
+          className="border-b border-mono-200 bg-white sticky top-0 z-20"
+        >
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <motion.button
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  setCurrentView('home')
+                  setSelectedExercises([])
+                  setTemplateReference(null)
+                  setSessionPlannerKey(prev => prev + 1) // Force SessionPlanner to remount
+                  window.history.pushState({ view: 'home' }, '', window.location.pathname)
+                }}
+              >
+                <Dumbbell size={36} className="text-mono-900" strokeWidth={2} />
+                <h1 className="text-3xl font-bold text-mono-900 tracking-tight leading-none">
+                  TheGradual.com
                 </h1>
-                <p className="text-sm text-mono-500 uppercase tracking-wide">
-                  Your Step by Step Gym Tracker
-                </p>
-              </div>
-            </motion.button>
-          </div>
-        </div>
+              </motion.button>
 
-        {/* Debug Status Bar - Height increased by 10% */}
-        <div className="w-full bg-mono-900 text-mono-50 px-4 py-1.5 flex items-center justify-between text-xs font-mono">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowDebugModal(true)}
-              className="flex items-center gap-1.5 hover:bg-mono-800 px-2 py-1 rounded transition-colors cursor-pointer"
-              title="Click to view QR code and transfer options"
-            >
-              <span className="text-mono-400">ID:</span>
-              <span className="text-white font-medium underline decoration-dotted">{userId.slice(0, 4)}</span>
-            </button>
-            <div className="flex items-center gap-1">
-              {isOnline ? (
-                <Cloud size={14} className="text-green-400" />
-              ) : (
-                <CloudOff size={14} className="text-orange-400" />
-              )}
+              {/* Auth Button */}
+              <AuthButton />
             </div>
-            <div className="flex items-center gap-1">
-              {isSynced ? (
-                <Check size={14} className="text-green-400" />
-              ) : (
-                <RefreshCw size={14} className="text-mono-400" />
-              )}
-            </div>
-            {lastSync && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-mono-500 text-[10px]">{lastSync.toLocaleTimeString()}</span>
-              </div>
-            )}
           </div>
-          <button
-            onClick={() => setShowDebugModal(true)}
-            className="text-mono-400 hover:text-white transition-colors text-[10px] uppercase"
-          >
-            [debug]
-          </button>
-        </div>
 
         {/* Integrated Session Dock */}
         <FloatingSessionIndicator
@@ -298,8 +274,8 @@ function App() {
               <Progress />
             )}
 
-            {currentView === 'health' && (
-              <HealthMetrics />
+            {currentView === 'profile' && (
+              <Profile />
             )}
           </motion.div>
         </AnimatePresence>
@@ -340,117 +316,6 @@ function App() {
         </div>
       </motion.nav>
 
-      {/* Debug Modal */}
-      <AnimatePresence>
-        {showDebugModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowDebugModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-4 border-b border-mono-200">
-                <h3 className="text-lg font-bold text-mono-900">Debug: User State</h3>
-                <button
-                  onClick={() => setShowDebugModal(false)}
-                  className="text-mono-400 hover:text-mono-600 transition-colors"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="p-4 overflow-auto flex-1">
-                {/* Device Transfer Section */}
-                <div className="mb-6 pb-6 border-b border-mono-200">
-                  <h4 className="text-sm font-bold text-mono-900 mb-3">📱 Transfer to Another Device</h4>
-
-                  {/* QR Code */}
-                  <div className="flex justify-center mb-4">
-                    <div className="p-4 bg-white border-2 border-mono-900 inline-block">
-                      <QRCodeSVG
-                        value={`https://thegradual.com/transfer?userId=${userId}`}
-                        size={200}
-                        level="H"
-                        includeMargin={false}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Transfer Link */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold text-mono-700 mb-2">
-                      Or copy this link:
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={`https://thegradual.com/transfer?userId=${userId}`}
-                        className="flex-1 px-3 py-2 text-xs border border-mono-300 rounded font-mono bg-mono-50"
-                        onClick={(e) => e.target.select()}
-                      />
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(`https://thegradual.com/transfer?userId=${userId}`)
-                          alert('Link copied!')
-                        }}
-                        className="px-3 py-2 bg-mono-900 text-white rounded hover:bg-mono-800 transition-colors"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Instructions */}
-                  <div className="bg-cyan-50 border-l-4 border-cyan-500 p-3 text-xs text-mono-700">
-                    <p className="font-bold mb-2">📖 How to transfer:</p>
-                    <ol className="list-decimal list-inside space-y-1 ml-2">
-                      <li>Open this app on your new device</li>
-                      <li>Scan the QR code or paste the link</li>
-                      <li>Accept the transfer to sync your data</li>
-                    </ol>
-                  </div>
-                </div>
-
-                {/* Debug Info Section */}
-                <div className="mb-4 text-xs text-mono-600 space-y-1">
-                  <div><strong>User ID:</strong> {userId}</div>
-                  <div><strong>Status:</strong> {isOnline ? 'Online' : 'Offline'}</div>
-                  <div><strong>Last Sync:</strong> {StateManager.getLastSyncTime()?.toLocaleString() || 'Never'}</div>
-                </div>
-                <pre className="bg-mono-100 p-4 rounded text-xs font-mono overflow-auto">
-                  {JSON.stringify(StateManager.state, null, 2)}
-                </pre>
-              </div>
-              <div className="p-4 border-t border-mono-200 flex gap-2">
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(JSON.stringify(StateManager.state, null, 2))
-                    alert('State copied to clipboard!')
-                  }}
-                  className="flex-1 bg-cyan-500 text-white px-4 py-2 rounded hover:bg-cyan-600 transition-colors text-sm"
-                >
-                  Copy JSON
-                </button>
-                <button
-                  onClick={() => setShowDebugModal(false)}
-                  className="flex-1 bg-mono-200 text-mono-700 px-4 py-2 rounded hover:bg-mono-300 transition-colors text-sm"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Transfer Confirmation Modal */}
       {transferUserId && (
         <TransferConfirmation
@@ -459,7 +324,11 @@ function App() {
           onSuccess={handleSuccessTransfer}
         />
       )}
-    </div>
+
+      {/* Welcome Onboarding Modal (for new users) */}
+      <WelcomeOnboardingModal />
+      </div>
+    </AuthProvider>
   )
 }
 

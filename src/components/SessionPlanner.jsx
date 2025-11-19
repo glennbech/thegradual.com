@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Plus, Play, X, Zap, Clock, Target, Sparkles, Trash2, ChevronDown, ChevronUp, Dumbbell } from 'lucide-react'
+import { Search, Plus, Play, X, Clock, Target, Sparkles, Trash2, ChevronDown, ChevronUp, Dumbbell, Edit2 } from 'lucide-react'
 import { staggerContainer, staggerItem } from '../utils/animations'
 import { exerciseService, sessionService, templateService } from '../services/stateService'
 import { headingStyles, iconSizes } from '../utils/typography'
 import { getMuscleColor } from '../utils/design-system'
 import ExerciseCard from './ExerciseCard'
-import QuickTemplateCard from './QuickTemplateCard'
 import workoutTemplates from '../data/workoutTemplates.json'
 
 export default function SessionPlanner({ onStartSession }) {
@@ -17,11 +16,9 @@ export default function SessionPlanner({ onStartSession }) {
   const [showTemplates, setShowTemplates] = useState(true)
   const [showSuggestedWorkouts, setShowSuggestedWorkouts] = useState(true) // Keep suggested workouts open by default
   const [showAllTemplates, setShowAllTemplates] = useState(false) // Show only 3 templates initially
-  const [showQuickStart, setShowQuickStart] = useState(true) // Collapse quick start
   const [showPersonalWorkouts, setShowPersonalWorkouts] = useState(true) // Collapse personal workouts
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(true) // Start with exercise library expanded
   const [customTemplates, setCustomTemplates] = useState([])
-  const [lastSession, setLastSession] = useState(null) // Last completed session
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -42,16 +39,6 @@ export default function SessionPlanner({ onStartSession }) {
     loadCustomTemplates()
   }, [])
 
-  // Load last completed session when exercises load
-  useEffect(() => {
-    if (exercises.length > 0) {
-      loadLastSession()
-    }
-  }, [exercises, customTemplates])
-
-  // Show suggested workouts expanded when no personal content exists
-  // Removed: Auto-collapse logic - keep Suggested Workouts always expanded by default
-
   const loadExercises = async () => {
     const data = await exerciseService.getAll()
     setExercises(data)
@@ -60,24 +47,6 @@ export default function SessionPlanner({ onStartSession }) {
   const loadCustomTemplates = async () => {
     const data = await templateService.getAllCustom()
     setCustomTemplates(data)
-  }
-
-  const loadLastSession = async () => {
-    const session = await sessionService.getLastCompletedSession()
-    if (session && session.templateReference) {
-      // Find the template that was used
-      let template = customTemplates.find(t => t.id === session.templateReference.templateId)
-      if (!template) {
-        template = workoutTemplates.find(t => t.id === session.templateReference.templateId)
-      }
-
-      if (template) {
-        setLastSession({
-          ...session,
-          template: template
-        })
-      }
-    }
   }
 
   const handleDeleteTemplate = async (templateId, e) => {
@@ -287,14 +256,12 @@ export default function SessionPlanner({ onStartSession }) {
       // If overwriting an existing template, UPDATE it (preserve ID)
       const existingTemplate = customTemplates.find(t => t.name === templateForm.name)
       if (existingTemplate) {
-        console.log('Updating existing template:', existingTemplate.id)
         await templateService.update(existingTemplate.id, {
           ...templateForm,
           exerciseIds,
         })
       } else {
         // Create new template
-        console.log('Creating new template')
         await templateService.create({ ...templateForm, exerciseIds })
       }
 
@@ -364,7 +331,7 @@ export default function SessionPlanner({ onStartSession }) {
         </div>
 
         {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-mono-900/60 via-mono-900/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-mono-900/40 via-mono-900/10 to-transparent" />
 
         {/* Content */}
         <div className="relative z-10 flex items-center justify-center h-full p-6 md:p-8">
@@ -388,57 +355,6 @@ export default function SessionPlanner({ onStartSession }) {
           </div>
         </div>
       </motion.div>
-
-      {/* Quick Start Section */}
-      {lastSession && selectedExercises.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-3"
-        >
-          <button
-            onClick={() => setShowQuickStart(!showQuickStart)}
-            className="w-full flex items-center justify-between group hover:opacity-80 transition-opacity"
-          >
-            <div className="flex items-center gap-2">
-              <h2 className={headingStyles.h2}>
-                <Zap className={`${iconSizes.h2} inline`} strokeWidth={2} />
-                {' '}Quick Start
-              </h2>
-            </div>
-            <ChevronDown
-              className={`w-5 h-5 text-mono-900 transition-transform ${showQuickStart ? 'rotate-180' : ''}`}
-              strokeWidth={2}
-            />
-          </button>
-          <p className="text-xs text-mono-500 uppercase tracking-wide">
-            Your recent sessions
-          </p>
-
-          <AnimatePresence>
-            {showQuickStart && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                  <QuickTemplateCard
-                    template={lastSession.template}
-                    exercises={lastSession.template.exerciseIds
-                      .map(id => exercises.find(ex => ex.id === id))
-                      .filter(Boolean)}
-                    lastPerformed={new Date(lastSession.createdAt).getTime()}
-                    onStart={() => handleStartWorkoutFromTemplate(lastSession.template)}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      )}
 
       {/* Workout Templates */}
       <AnimatePresence>
@@ -509,67 +425,85 @@ export default function SessionPlanner({ onStartSession }) {
                       >
                         <AnimatePresence mode="popLayout">
                           {customTemplates.map((template) => {
+                            // Get muscle groups from exercises
+                            const templateExercises = exercises.filter(ex => template.exerciseIds.includes(ex.id))
+                            const muscleGroups = [...new Set(templateExercises.map(ex => ex.category))].filter(Boolean)
+
                             return (
                               <motion.div
                                 key={template.id}
                                 variants={staggerItem}
                                 exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
                                 layout
-                                className="card-flat p-4 hover:border-mono-400 transition-colors relative cursor-pointer"
-                                onClick={() => handleLoadTemplate(template)}
+                                className="card-flat p-6 hover:border-mono-400 transition-colors relative cursor-pointer min-h-[220px] flex flex-col"
+                                onClick={() => handleStartWorkoutFromTemplate(template)}
                               >
-                                <div className="flex items-start justify-between mb-3 border-b border-mono-100 pb-2">
-                                  <div className="flex-1">
-                                    <h4 className={headingStyles.h4}>
-                                      {template.name}
-                                    </h4>
+                                {/* Prominent Title - Black background, white text */}
+                                <div className="bg-mono-900 px-4 py-3 -m-6 mb-4">
+                                  <h4 className="text-white font-bold text-lg uppercase tracking-tight">
+                                    {template.name}
+                                  </h4>
+                                </div>
+
+                                <p className="text-sm text-mono-600 mb-4 line-clamp-2 px-1">
+                                  {template.description}
+                                </p>
+
+                                {/* Muscle Groups */}
+                                {muscleGroups.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 mb-4 px-1">
+                                    {muscleGroups.map(group => (
+                                      <span
+                                        key={group}
+                                        className="px-2 py-1 text-xs font-bold uppercase tracking-wide border-2 border-mono-900 text-mono-900"
+                                        style={{ borderColor: getMuscleColor(group), color: getMuscleColor(group) }}
+                                      >
+                                        {group}
+                                      </span>
+                                    ))}
                                   </div>
-                                  {/* Delete button */}
+                                )}
+
+                                {/* Metadata - Aligned horizontally */}
+                                <div className="flex items-center justify-between border-t-2 border-mono-200 pt-3 mt-auto">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-5 h-5 text-mono-600" strokeWidth={2} />
+                                    <span className="font-bold text-base text-mono-900">{template.duration}</span>
+                                  </div>
+                                  <div className="w-px h-6 bg-mono-300" />
+                                  <div className="flex items-center gap-2">
+                                    <Dumbbell className="w-5 h-5 text-mono-600" strokeWidth={2} />
+                                    <span className="font-bold text-base text-mono-900">{template.exerciseIds.length} ex</span>
+                                  </div>
+                                  <div className="w-px h-6 bg-mono-300" />
+                                  <motion.button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleLoadTemplate(template);
+                                    }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="flex items-center gap-1.5 text-mono-600 hover:text-mono-900 transition-colors text-sm font-medium uppercase tracking-wide"
+                                    title="Edit workout"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                    Edit
+                                  </motion.button>
+                                </div>
+
+                                {/* Delete button only */}
+                                <div className="absolute top-2 right-2">
                                   <motion.button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleDeleteTemplate(template.id, e);
                                     }}
                                     whileTap={{ scale: 0.9 }}
-                                    className="text-mono-500 hover:text-red-600 p-1 hover:bg-red-50 transition-colors rounded"
+                                    className="p-1.5 bg-white/80 hover:bg-white text-mono-600 hover:text-red-600 transition-colors"
                                     title="Delete"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </motion.button>
                                 </div>
-
-                                <p className="text-xs text-mono-500 mb-3 line-clamp-2">
-                                  {template.description}
-                                </p>
-
-                                {/* Metadata - Compact icon row */}
-                                <div className="flex items-center gap-4 text-xs text-mono-600 mb-3">
-                                  <div className="flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5" strokeWidth={2} />
-                                    <span className="font-medium text-mono-900">{template.duration}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <Target className="w-3.5 h-3.5" strokeWidth={2} />
-                                    <span className="font-medium text-mono-900">{template.frequency}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <Dumbbell className="w-3.5 h-3.5" strokeWidth={2} />
-                                    <span className="font-medium text-mono-900">{template.exerciseIds.length}</span>
-                                  </div>
-                                </div>
-
-                                {/* WORK OUT! Button */}
-                                <motion.button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStartWorkoutFromTemplate(template);
-                                  }}
-                                  whileTap={{ scale: 0.98 }}
-                                  className="w-full bg-mono-900 hover:bg-mono-800 text-white py-2 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors"
-                                >
-                                  <Play className="w-4 h-4" fill="white" />
-                                  WORK OUT!
-                                </motion.button>
                               </motion.div>
                             )
                           })}
@@ -616,54 +550,71 @@ export default function SessionPlanner({ onStartSession }) {
                     >
                       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                         {(showAllTemplates ? workoutTemplates : workoutTemplates.slice(0, 3)).map((template) => {
-                  return (
-                    <motion.div
-                      key={template.id}
-                      variants={staggerItem}
-                      className="card-flat p-4 hover:border-mono-400 transition-colors cursor-pointer"
-                      onClick={() => handleLoadTemplate(template)}
-                    >
-                      <div className="flex items-start justify-between mb-3 border-b border-mono-100 pb-2">
-                        <h4 className={`${headingStyles.h4} flex-1`}>
-                          {template.name}
-                        </h4>
-                      </div>
+                          // Get muscle groups from exercises
+                          const templateExercises = exercises.filter(ex => template.exerciseIds.includes(ex.id))
+                          const muscleGroups = [...new Set(templateExercises.map(ex => ex.category))].filter(Boolean)
 
-                      <p className="text-xs text-mono-500 mb-3 line-clamp-2">
-                        {template.description}
-                      </p>
+                          return (
+                            <motion.div
+                              key={template.id}
+                              variants={staggerItem}
+                              className="card-flat p-6 hover:border-mono-400 transition-colors cursor-pointer relative min-h-[200px]"
+                              onClick={() => handleStartWorkoutFromTemplate(template)}
+                            >
+                              {/* Prominent Title - Black background, white text */}
+                              <div className="bg-mono-900 px-4 py-3 -m-6 mb-4">
+                                <h4 className="text-white font-bold text-lg uppercase tracking-tight">
+                                  {template.name}
+                                </h4>
+                              </div>
 
-                      {/* Metadata - Compact icon row */}
-                      <div className="flex items-center gap-4 text-xs text-mono-600 mb-3">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" strokeWidth={2} />
-                          <span className="font-medium text-mono-900">{template.duration}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Target className="w-3.5 h-3.5" strokeWidth={2} />
-                          <span className="font-medium text-mono-900">{template.frequency}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Dumbbell className="w-3.5 h-3.5" strokeWidth={2} />
-                          <span className="font-medium text-mono-900">{template.exerciseIds.length}</span>
-                        </div>
-                      </div>
+                              <p className="text-sm text-mono-600 mb-4 line-clamp-2 px-1">
+                                {template.description}
+                              </p>
 
-                      {/* WORK OUT! Button */}
-                      <motion.button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartWorkoutFromTemplate(template);
-                        }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full bg-mono-900 hover:bg-mono-800 text-white py-2 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <Play className="w-4 h-4" fill="white" />
-                        WORK OUT!
-                      </motion.button>
-                    </motion.div>
-                  )
-                })}
+                              {/* Muscle Groups */}
+                              {muscleGroups.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-4 px-1">
+                                  {muscleGroups.map(group => (
+                                    <span
+                                      key={group}
+                                      className="px-2 py-1 text-xs font-bold uppercase tracking-wide border-2 border-mono-900 text-mono-900"
+                                      style={{ borderColor: getMuscleColor(group), color: getMuscleColor(group) }}
+                                    >
+                                      {group}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Metadata - Aligned horizontally */}
+                              <div className="flex items-center justify-between border-t-2 border-mono-200 pt-3 mt-auto">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-5 h-5 text-mono-600" strokeWidth={2} />
+                                  <span className="font-bold text-base text-mono-900">{template.duration}</span>
+                                </div>
+                                <div className="w-px h-6 bg-mono-300" />
+                                <div className="flex items-center gap-2">
+                                  <Dumbbell className="w-5 h-5 text-mono-600" strokeWidth={2} />
+                                  <span className="font-bold text-base text-mono-900">{template.exerciseIds.length} ex</span>
+                                </div>
+                                <div className="w-px h-6 bg-mono-300" />
+                                <motion.button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleLoadTemplate(template);
+                                  }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="flex items-center gap-1.5 text-mono-600 hover:text-mono-900 transition-colors text-sm font-medium uppercase tracking-wide"
+                                  title="Edit workout"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                  Edit
+                                </motion.button>
+                              </div>
+                            </motion.div>
+                          )
+                        })}
                       </div>
 
                       {/* Show More Button */}
