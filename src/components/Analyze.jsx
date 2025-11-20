@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { TrendingUp } from 'lucide-react';
 import useWorkoutStore from '../stores/workoutStore';
 import { getMuscleColor } from '../utils/design-system';
 import {
@@ -267,13 +268,19 @@ export default function Analyze() {
         </div>
 
         {/* Empty state */}
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">📊</div>
-          <h3 className="text-xl font-semibold text-mono-900 mb-2">No Data Yet</h3>
-          <p className="text-mono-500">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center py-16 bg-white border-2 border-mono-200"
+        >
+          <div className="bg-mono-900 p-6 rounded-full inline-block mb-4">
+            <TrendingUp className="w-16 h-16 text-white" strokeWidth={2} />
+          </div>
+          <h2 className="text-2xl font-bold text-mono-900 mb-2 uppercase">No Data Yet</h2>
+          <p className="text-mono-500 max-w-md mx-auto">
             Complete some workouts to see your strength analytics
           </p>
-        </div>
+        </motion.div>
       </motion.div>
     );
   }
@@ -295,20 +302,6 @@ export default function Analyze() {
           Scientific strength metrics and 1RM estimations
         </p>
       </div>
-
-      {/* Volume Heatmap Section */}
-      {volumeData && volumeData.length > 0 && (
-        <motion.section variants={staggerContainer} initial="initial" animate="animate">
-          <motion.div variants={staggerItem}>
-            <h2 className="text-xl font-bold text-mono-900 mb-4 uppercase tracking-tight">
-              Training Volume
-            </h2>
-            <div className="bg-white border border-mono-200 rounded-lg p-6">
-              <VolumeHeatmap data={volumeData} />
-            </div>
-          </motion.div>
-        </motion.section>
-      )}
 
       {/* Estimated 1RM Section */}
       <motion.section variants={staggerContainer} initial="initial" animate="animate">

@@ -117,14 +117,8 @@ export const AuthProvider = ({ children }) => {
       }
 
 
-      // Check if anonymous user has any data to migrate
-      const hasLocalData = localStorage.getItem('thegradual-workout-store');
-
-      if (!hasLocalData) {
-        return;
-      }
-
-      // Fetch data from API for the anonymous user (if exists)
+      // Fetch data from DynamoDB for the anonymous user (if exists)
+      // No need to check localStorage - cloud is the source of truth
       try {
         const API_BASE_URL = 'https://api.thegradual.com';
         const response = await fetch(`${API_BASE_URL}/api/${anonymousUserId}`);
@@ -206,27 +200,20 @@ export const AuthProvider = ({ children }) => {
       await migrateAnonymousData(userInfo.sub);
 
       // ==========================================
-      // SAFE CACHE RELOAD FROM API
+      // LOAD DATA FROM DYNAMODB (cloud is the truth)
       // ==========================================
-      console.log('🔄 Attempting to load fresh data from API after login...');
+      console.log('🔄 Loading fresh data from DynamoDB after login...');
 
       // Get Zustand store methods
       const workoutStore = useWorkoutStore.getState();
 
-      // Clear localStorage cache FIRST (to prevent stale data)
-      // The Zustand persist middleware will pick up the cleared state
-      localStorage.removeItem('thegradual-workout-store');
-      console.log('🗑️ Cleared Zustand localStorage cache');
-
-      // Try to load fresh data from API
+      // Load fresh data from API
       const result = await workoutStore.loadFromAPI();
 
       if (result.success) {
-        console.log('✅ Successfully loaded fresh data from API');
+        console.log('✅ Successfully loaded fresh data from DynamoDB');
       } else {
-        console.warn('⚠️ Failed to load from API, but continuing with login:', result.error);
-        // Note: User will see empty state initially, but can still use the app
-        // Their data is safely stored in API under their Cognito sub
+        console.warn('⚠️ Failed to load from DynamoDB, but continuing with login:', result.error);
       }
 
       // Set user info
@@ -283,12 +270,11 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear Zustand cache
+      // Clear in-memory workout state
       const workoutStore = useWorkoutStore.getState();
       workoutStore.clearCache();
 
-      // Clear localStorage (Zustand persist will handle this too)
-      localStorage.removeItem('thegradual-workout-store');
+      // Clear auth token
       localStorage.removeItem('idToken');
 
       // Clear auth state

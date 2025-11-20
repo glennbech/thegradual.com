@@ -11,8 +11,6 @@ import {
   X,
   Info,
   Check,
-  Clock,
-  Dumbbell,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import useWorkoutStore from '../stores/workoutStore';
@@ -26,6 +24,7 @@ export default function ExerciseLogger({
   exercises,
   templateReference,
   onComplete,
+  onDiscard,
   onSessionCreated,
 }) {
   // Zustand store
@@ -33,6 +32,7 @@ export default function ExerciseLogger({
   const startSession = useWorkoutStore((state) => state.startSession);
   const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession);
   const completeSession = useWorkoutStore((state) => state.completeSession);
+  const clearActiveSession = useWorkoutStore((state) => state.clearActiveSession);
   const getPreviousSessionForExercise = useWorkoutStore((state) => state.getPreviousSessionForExercise);
   const sessions = useWorkoutStore((state) => state.sessions);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
@@ -41,6 +41,7 @@ export default function ExerciseLogger({
   const [setType, setSetType] = useState('working');
   const [showSetTypeSelector, setShowSetTypeSelector] = useState(false);
   const [showExerciseDescription, setShowExerciseDescription] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [editingSetIndex, setEditingSetIndex] = useState(null);
   const [editingSetData, setEditingSetData] = useState(null);
 
@@ -49,15 +50,7 @@ export default function ExerciseLogger({
   const [comparison, setComparison] = useState(null);
 
   // Session Tracking
-  const [sessionStartTime] = useState(Date.now());
-  const [sessionTime, setSessionTime] = useState(0);
   const hasInitialized = useRef(false);
-
-  // Exercise Timer & Rest Timer
-  const [exerciseStartTime, setExerciseStartTime] = useState(Date.now());
-  const [exerciseTime, setExerciseTime] = useState(0);
-  const [isResting, setIsResting] = useState(false);
-  const [restTimeRemaining, setRestTimeRemaining] = useState(90); // 1:30 in seconds
 
   // Add Set Form - Collapsed by default
   const [showAddSetForm, setShowAddSetForm] = useState(false);
@@ -156,7 +149,10 @@ export default function ExerciseLogger({
       return;
     }
 
+    // GUARD: Don't initialize if exercises array is empty or undefined
+    // This prevents re-initialization when discarding a session
     if (!exercises || exercises.length === 0) {
+      console.log('[ExerciseLogger] Skipping initialization - no exercises provided');
       return;
     }
 
@@ -164,6 +160,8 @@ export default function ExerciseLogger({
 
     const initSession = async () => {
       try {
+        console.log('[ExerciseLogger] Initializing new session with', exercises.length, 'exercises');
+
         // Get previous session data if template is specified
         let previousSession = null;
         if (templateReference?.templateId) {
@@ -207,6 +205,7 @@ export default function ExerciseLogger({
 
         // Create session using Zustand store (await for API persistence)
         const session = await startSession(preparedExercises, templateReference);
+        console.log('[ExerciseLogger] Session initialized:', session.id);
         if (onSessionCreated) {
           onSessionCreated(session);
         }
@@ -218,60 +217,6 @@ export default function ExerciseLogger({
 
     initSession();
   }, [activeSession, exercises, templateReference, startSession, onSessionCreated, sessions]);
-
-  // Session timer
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSessionTime(
-        Math.floor((Date.now() - (activeSession?.startTime || sessionStartTime)) / 1000)
-      );
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [activeSession, sessionStartTime]);
-
-  // Exercise timer - tracks time since exercise started
-  useEffect(() => {
-    if (isResting) return; // Don't update exercise time during rest
-
-    const interval = setInterval(() => {
-      setExerciseTime(Math.floor((Date.now() - exerciseStartTime) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [exerciseStartTime, isResting]);
-
-  // Rest timer - counts down from 90 seconds
-  useEffect(() => {
-    if (!isResting) return;
-
-    const interval = setInterval(() => {
-      setRestTimeRemaining((prev) => {
-        if (prev <= 1) {
-          // Rest time is up - celebration and switch back to exercise timer
-          confetti({
-            particleCount: 50,
-            spread: 70,
-            origin: { y: 0.3 },
-            colors: ['#F97316', '#10B981'],
-            scalar: 1.0,
-          });
-          setIsResting(false);
-          setRestTimeRemaining(90); // Reset for next time
-          return 90;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isResting]);
-
-  // Reset exercise timer when changing exercises
-  useEffect(() => {
-    setExerciseStartTime(Date.now());
-    setExerciseTime(0);
-    setIsResting(false);
-    setRestTimeRemaining(90);
-  }, [currentExerciseIndex]);
 
   // Load exercise data - SIMPLIFIED: Just sync what's in activeSession
   useEffect(() => {
@@ -337,12 +282,13 @@ export default function ExerciseLogger({
         }, 300);
       } else {
         // Start rest timer after completing a set (but not the last one)
-        setIsResting(true);
-        setRestTimeRemaining(90);
+        // Trigger rest timer in the ActiveSessionHeader using a timestamp (so it's unique)
+        updateActiveSession({
+          exercises: updatedExercises,
+          triggerRestTimerTimestamp: Date.now()
+        });
+        return; // Return early since we already updated
       }
-    } else {
-      // If unchecking a set, stop resting
-      setIsResting(false);
     }
 
     // Update Zustand store
@@ -416,11 +362,10 @@ export default function ExerciseLogger({
       const newIndex = currentExerciseIndex + 1;
       setCurrentExerciseIndex(newIndex);
       setCurrentSet({ reps: 10, weight: 20 });
-      setIsResting(false);
       setShowExerciseDescription(false);
       setShowSetTypeSelector(false);
 
-      // Save current exercise index to activeSession
+      // Save current exercise index to activeSession (timer will auto-reset in ActiveSessionHeader)
       updateActiveSession({ currentExerciseIndex: newIndex });
     }
   };
@@ -430,11 +375,10 @@ export default function ExerciseLogger({
       const newIndex = currentExerciseIndex - 1;
       setCurrentExerciseIndex(newIndex);
       setCurrentSet({ reps: 10, weight: 20 });
-      setIsResting(false);
       setShowExerciseDescription(false);
       setShowSetTypeSelector(false);
 
-      // Save current exercise index to activeSession
+      // Save current exercise index to activeSession (timer will auto-reset in ActiveSessionHeader)
       updateActiveSession({ currentExerciseIndex: newIndex });
     }
   };
@@ -502,9 +446,28 @@ export default function ExerciseLogger({
   };
 
   const handleDiscardSession = () => {
-    if (confirm('Discard this workout? All progress will be lost.')) {
-      setActiveSession(null);
-      onComplete?.();
+    setShowDiscardDialog(true);
+  };
+
+  const confirmDiscardSession = async () => {
+    console.log('[ExerciseLogger] Discarding session...');
+    try {
+      setShowDiscardDialog(false);
+      if (onDiscard) {
+        console.log('[ExerciseLogger] Calling onDiscard callback');
+        await onDiscard(); // This handles clearing session AND navigation
+        console.log('[ExerciseLogger] onDiscard completed successfully');
+      } else {
+        // Fallback if onDiscard not provided
+        console.log('[ExerciseLogger] No onDiscard callback, using fallback');
+        await clearActiveSession();
+        onComplete?.();
+      }
+    } catch (error) {
+      console.error('[ExerciseLogger] Failed to discard session:', error);
+      alert('Failed to discard session. Please try again.');
+      // Show the error but still try to clear the dialog
+      setShowDiscardDialog(false);
     }
   };
 
@@ -543,166 +506,125 @@ export default function ExerciseLogger({
         cancelText="Keep Going"
       />
 
-      <div className="space-y-4 pb-32">
-      {/* Prominent Progress Bar - 50% Taller */}
-      <motion.div
-        className="border-b-4 border-mono-900 -mx-4"
-        animate={{
-          backgroundColor: isResting ? '#ea580c' : '#111827' // Orange when resting, dark when exercising
-        }}
-        transition={{ duration: 0.5 }}
-      >
-        {/* Progress Bar Visual */}
-        <div className="h-2 bg-mono-700">
+      {/* Discard Session Dialog */}
+      <AnimatePresence>
+        {showDiscardDialog && (
           <motion.div
-            className="h-full bg-white"
-            initial={{ width: 0 }}
-            animate={{
-              width: `${((currentExerciseIndex + 1) / activeSession.exercises.length) * 100}%`
-            }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-          />
-        </div>
-
-        {/* Stats Row - 50% taller (py-3 -> py-5) */}
-        <div className="px-4 py-5 flex items-center justify-between">
-          {/* Exercise Progress - PROMINENT */}
-          <div className="flex items-center gap-3">
-            <Dumbbell className="w-6 h-6 text-white" strokeWidth={2.5} />
-            <div>
-              <div className="text-xs text-white/60 uppercase tracking-wide mb-0.5">Exercise</div>
-              <div className="text-2xl font-black text-white tabular-nums">
-                {currentExerciseIndex + 1}/{activeSession.exercises.length}
-              </div>
-            </div>
-          </div>
-
-          {/* Timer Display - Switches between Exercise Timer and Rest Timer */}
-          <AnimatePresence mode="wait">
-            {isResting ? (
-              <motion.div
-                key="rest-timer"
-                initial={{ scale: 0.8, opacity: 0, y: -10 }}
-                animate={{
-                  scale: 1,
-                  opacity: 1,
-                  y: 0,
-                }}
-                exit={{ scale: 0.8, opacity: 0, y: 10 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-center gap-3"
-              >
-                <motion.div
-                  animate={{ rotate: [0, 10, -10, 0] }}
-                  transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
-                >
-                  <Clock className="w-6 h-6 text-orange-300" strokeWidth={2.5} />
-                </motion.div>
-                <div className="text-center">
-                  <div className="text-xs text-orange-200 uppercase tracking-wide mb-0.5 font-bold">Rest Timer</div>
-                  <motion.div
-                    className="text-2xl font-black text-orange-300 tabular-nums"
-                    animate={{
-                      scale: restTimeRemaining <= 10 ? [1, 1.1, 1] : 1,
-                      color: restTimeRemaining <= 10 ? ['#fdba74', '#fbbf24', '#fdba74'] : '#fdba74'
-                    }}
-                    transition={{ duration: 0.5, repeat: restTimeRemaining <= 10 ? Infinity : 0 }}
-                  >
-                    {Math.floor(restTimeRemaining / 60)}:{String(restTimeRemaining % 60).padStart(2, '0')}
-                  </motion.div>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="exercise-timer"
-                initial={{ scale: 0.8, opacity: 0, y: 10 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.8, opacity: 0, y: -10 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-center gap-3"
-              >
-                <Clock className="w-6 h-6 text-white" strokeWidth={2.5} />
-                <div className="text-center">
-                  <div className="text-xs text-white/60 uppercase tracking-wide mb-0.5">Exercise Time</div>
-                  <div className="text-2xl font-black text-white tabular-nums">
-                    {formatDuration(exerciseTime)}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Discard Button */}
-          <motion.button
-            onClick={handleDiscardSession}
-            className="text-white/60 hover:text-white"
-            whileTap={{ scale: 0.95 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-mono-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDiscardDialog(false)}
           >
-            <Trash2 className="w-6 h-6" strokeWidth={2.5} />
-          </motion.button>
-        </div>
-      </motion.div>
-
-      {/* Exercise Navigation Bar - Cleaner */}
-      <div className="bg-white border-2 border-mono-900">
-        <div className="flex items-center gap-3 p-4">
-          {/* Exercise Name - Prominent & Clickable */}
-          <div
-            className="flex-1 cursor-pointer hover:bg-mono-50 -m-2 p-2 rounded transition-colors"
-            onClick={() => setShowExerciseDetail(true)}
-          >
-            <p className={`${headingStyles.label} mb-1 tabular-nums flex items-center gap-2`}>
-              <span>Exercise {currentExerciseIndex + 1} / {activeSession.exercises.length}</span>
-              <Info className="w-3 h-3 text-mono-500" />
-            </p>
-            <h2
-              className={headingStyles.h1}
-              style={{ color: getMuscleColor(currentExercise.category) }}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white border-2 border-mono-900 max-w-md w-full"
             >
-              {currentExercise.name}
-            </h2>
-            <p className={`${headingStyles.label} mt-1`}>
-              {currentExercise.category}
-            </p>
-          </div>
+              <div className="bg-red-500 h-1" />
+              <div className="p-6 space-y-4">
+                <h3 className={headingStyles.h2}>Discard Workout?</h3>
+                <p className="text-sm text-mono-700">
+                  All progress from this workout will be lost. You won't be able to continue this session later.
+                </p>
+                <div className="bg-mono-50 border border-mono-200 p-3 text-xs text-mono-600">
+                  <p><strong>Warning:</strong></p>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>All sets and progress will be deleted</li>
+                    <li>This action cannot be undone</li>
+                    <li>You'll return to the home screen</li>
+                  </ul>
+                </div>
 
-          {/* Navigation Buttons - Compact */}
-          <div className="flex gap-2">
-            {currentExerciseIndex > 0 && (
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={handlePreviousExercise}
-                className="w-10 h-10 bg-white border border-mono-300 text-mono-900 flex items-center justify-center"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </motion.button>
-            )}
+                <div className="flex gap-3 pt-2">
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowDiscardDialog(false)}
+                    className="flex-1 bg-mono-200 hover:bg-mono-300 text-mono-900 py-3 font-medium transition-colors"
+                  >
+                    CANCEL
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={confirmDiscardSession}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 font-medium transition-colors"
+                  >
+                    DISCARD
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {currentExerciseIndex < activeSession.exercises.length - 1 ? (
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={handleNextExercise}
-                className="w-10 h-10 bg-mono-900 text-white flex items-center justify-center"
+      {/* Exercise Navigation Header */}
+      <div className="bg-mono-50 px-3 pt-3 pb-3">
+        <div className="bg-white border-2 border-mono-900">
+          <div className="flex items-center gap-3 p-4">
+            <div
+              className="flex-1 cursor-pointer hover:bg-mono-50 -m-2 p-2 rounded transition-colors"
+              onClick={() => setShowExerciseDetail(true)}
+            >
+              <p className={`${headingStyles.label} mb-1 tabular-nums flex items-center gap-2`}>
+                <span>Exercise {currentExerciseIndex + 1} / {activeSession.exercises.length}</span>
+                <Info className="w-3 h-3 text-mono-500" />
+              </p>
+              <h2
+                className={headingStyles.h1}
+                style={{ color: getMuscleColor(currentExercise.category) }}
               >
-                <ChevronRight className="w-5 h-5" />
-              </motion.button>
-            ) : (
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={handleCompleteWorkout}
-                className="px-4 h-10 bg-mono-900 text-white flex items-center justify-center gap-2 font-bold uppercase text-sm"
-              >
-                <Trophy className="w-4 h-4" />
-                Finish
-              </motion.button>
-            )}
+                {currentExercise.name}
+              </h2>
+              <p className={`${headingStyles.label} mt-1`}>
+                {currentExercise.category}
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              {currentExerciseIndex > 0 && (
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePreviousExercise}
+                  className="w-10 h-10 bg-white border border-mono-300 text-mono-900 flex items-center justify-center"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </motion.button>
+              )}
+
+              {currentExerciseIndex < activeSession.exercises.length - 1 ? (
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleNextExercise}
+                  className="w-10 h-10 bg-mono-900 text-white flex items-center justify-center"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </motion.button>
+              ) : (
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleCompleteWorkout}
+                  className="px-4 h-10 bg-mono-900 text-white flex items-center justify-center gap-2 font-bold uppercase text-sm"
+                >
+                  <Trophy className="w-4 h-4" />
+                  Finish
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-
-      {/* Previous Session - Clean Banner */}
-      {previousSessionData && previousSessionData.sets && previousSessionData.sets.length > 0 && (
+      {/* Scrollable Content Area */}
+      <div className="container mx-auto px-3 space-y-4 pb-32">
+        {/* Previous Session - Clean Banner */}
+        {previousSessionData && previousSessionData.sets && previousSessionData.sets.length > 0 && (
         <div className="px-4 py-3 bg-mono-50 border-2 border-mono-200">
           <p className="text-xs font-bold uppercase tracking-widest text-mono-600 mb-2 flex items-center gap-2">
             <Trophy className="w-3 h-3" />

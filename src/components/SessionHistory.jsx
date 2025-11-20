@@ -20,7 +20,7 @@ import useWorkoutStore from '../stores/workoutStore';
 import { headingStyles, iconSizes } from '../utils/typography';
 import SessionTimeline from './SessionTimeline';
 import { getMuscleColor } from '../utils/design-system';
-import WorkoutCalendar from './WorkoutCalendar';
+import BubbleCalendar from './BubbleCalendar';
 
 export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, onClearExpandedSession }) {
   // Zustand store
@@ -251,7 +251,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <WorkoutCalendar sessions={sessions} />
+        <BubbleCalendar sessions={sessions} />
       </motion.div>
 
       {/* Empty State */}

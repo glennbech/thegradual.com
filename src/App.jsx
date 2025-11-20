@@ -4,19 +4,21 @@ import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Chec
 import { QRCodeSVG } from 'qrcode.react'
 import { pageTransition } from './utils/animations'
 import SessionPlanner from './components/SessionPlanner'
-import ExerciseLogger from './components/ExerciseLogger'
+import SessionContainer from './components/SessionContainer'
 import SessionHistory from './components/SessionHistory'
 import Profile from './components/Profile'
 import Progress from './components/Progress'
 import Analyze from './components/Analyze'
-import FloatingSessionIndicator from './components/FloatingSessionIndicator'
 import TransferConfirmation from './components/TransferConfirmation'
 import AuthButton from './components/AuthButton'
 import WelcomeOnboardingModal from './components/WelcomeOnboardingModal'
 import LandingPage from './components/LandingPage'
+import ConnectionLostModal from './components/ConnectionLostModal'
+import ActiveSessionHeader from './components/ActiveSessionHeader'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getUserId } from './utils/userManager'
 import useWorkoutStore from './stores/workoutStore'
+import { Loader } from 'lucide-react'
 
 function AppContent() {
   // Auth state
@@ -25,7 +27,8 @@ function AppContent() {
   // Zustand store
   const activeSession = useWorkoutStore((state) => state.activeSession)
   const isOnline = useWorkoutStore((state) => state.isOnline)
-  const lastSync = useWorkoutStore((state) => state.lastSync)
+  const isLoading = useWorkoutStore((state) => state.isLoading)
+  const loadFromAPI = useWorkoutStore((state) => state.loadFromAPI)
   const clearActiveSession = useWorkoutStore((state) => state.clearActiveSession)
   const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession)
   const [currentView, setCurrentView] = useState('home')
@@ -37,8 +40,13 @@ function AppContent() {
   const [transferUserId, setTransferUserId] = useState(null) // Transfer from another device
   const userId = getUserId() // Get or create user UUID
 
-  // Check if synced recently (within last 5 seconds)
-  const isSynced = lastSync && (Date.now() - new Date(lastSync).getTime() < 5000)
+  // Load data from DynamoDB when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && isOnline) {
+      console.log('[App] Loading data from DynamoDB on mount...')
+      loadFromAPI()
+    }
+  }, [isAuthenticated, isOnline, loadFromAPI])
 
   // Debug logging for view changes
   useEffect(() => {
@@ -112,19 +120,31 @@ function AppContent() {
     window.history.pushState({ view: 'logger' }, '', window.location.pathname)
   }
 
-  const handleReturnToSession = () => {
+  const handleNavigateToLogger = () => {
     setCurrentView('logger')
     window.history.pushState({ view: 'logger' }, '', window.location.pathname)
   }
 
-  const handleCloseSession = async () => {
-    // Confirmation is now handled in FloatingSessionIndicator modal
+
+  const handleDiscardSession = async () => {
+    // For discard from ExerciseLogger - navigates to home
+    console.log('[App] handleDiscardSession called');
     try {
-      await clearActiveSession()
-      setCurrentView('home')
-      window.history.pushState({ view: 'home' }, '', window.location.pathname)
+      // CRITICAL: Clear UI state FIRST to prevent re-initialization
+      console.log('[App] Clearing UI state first...');
+      setSelectedExercises([]);
+      setTemplateReference(null);
+
+      console.log('[App] Clearing active session...');
+      await clearActiveSession();
+
+      console.log('[App] Active session cleared, navigating to home');
+      setCurrentView('home');
+      window.history.pushState({ view: 'home' }, '', window.location.pathname);
+      console.log('[App] Navigation complete, view set to home');
     } catch (error) {
-      console.error('handleCloseSession: Error clearing session:', error)
+      console.error('[App] handleDiscardSession: Error clearing session:', error);
+      throw error; // Re-throw so ExerciseLogger can show error
     }
   }
 
@@ -159,6 +179,9 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-mono-50 pb-16">
+        {/* Connection Lost Modal - blocks everything when offline */}
+        <ConnectionLostModal isOnline={isOnline} />
+
         {/* Header */}
         <motion.header
           initial={{ y: -100 }}
@@ -170,7 +193,7 @@ function AppContent() {
               <motion.button
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                className="cursor-pointer group"
                 onClick={() => {
                   setCurrentView('home')
                   setSelectedExercises([])
@@ -178,77 +201,108 @@ function AppContent() {
                   setSessionPlannerKey(prev => prev + 1) // Force SessionPlanner to remount
                   window.history.pushState({ view: 'home' }, '', window.location.pathname)
                 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <Dumbbell size={36} className="text-mono-900" strokeWidth={2} />
-                <h1 className="text-3xl font-bold text-mono-900 tracking-tight leading-none">
-                  TheGradual.com
-                </h1>
+                <div className="flex items-center gap-3">
+                  {/* Icon Badge */}
+                  <div className="w-10 h-10 bg-mono-900 flex items-center justify-center group-hover:bg-mono-800 transition-colors">
+                    <Dumbbell className="w-5 h-5 text-white" strokeWidth={2.5} />
+                  </div>
+
+                  {/* Wordmark */}
+                  <div className="leading-none select-none">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs font-bold uppercase tracking-widest text-mono-400">The</span>
+                      <span className="text-2xl font-black uppercase tracking-tight text-mono-900 -ml-0.5">Gradual</span>
+                    </div>
+                    <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-mono-400 mt-0.5 -ml-px">
+                      Progress Tracker
+                    </div>
+                  </div>
+                </div>
               </motion.button>
 
               {/* Auth Button */}
               <AuthButton />
             </div>
           </div>
-
-        {/* Integrated Session Dock */}
-        <FloatingSessionIndicator
-          activeSession={activeSession}
-          currentView={currentView}
-          onReturnToSession={handleReturnToSession}
-          onClose={handleCloseSession}
-        />
       </motion.header>
 
-      {/* Main Content */}
+      {/* Active Session Header - Always visible when session is active */}
+      <ActiveSessionHeader
+        onNavigateToLogger={handleNavigateToLogger}
+        onDiscard={handleDiscardSession}
+        currentView={currentView}
+      />
+
+      {/* Global Loading State */}
+      {isLoading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-white/80 backdrop-blur-sm z-30 flex items-center justify-center"
+        >
+          <div className="text-center">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="w-8 h-8 border-4 border-mono-900 border-t-transparent rounded-full mx-auto mb-3"
+            />
+            <p className="text-sm text-mono-600 font-medium">Loading...</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Main Content - Scrollable */}
       <main className="container mx-auto px-3 py-4">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentView}
-            {...pageTransition}
-          >
-            {currentView === 'home' && (
-              <SessionPlanner key={sessionPlannerKey} onStartSession={handleStartSession} />
-            )}
+        {/* Session Container - Only visible when currentView === 'logger', but stays mounted */}
+        {(activeSession || (selectedExercises && selectedExercises.length > 0)) && (
+          <div className={currentView === 'logger' ? 'block' : 'hidden'}>
+            <SessionContainer
+              exercises={selectedExercises}
+              templateReference={templateReference}
+              isVisible={currentView === 'logger'}
+              onComplete={handleCompleteSession}
+              onDiscard={handleDiscardSession}
+              onSessionCreated={handleSessionCreated}
+            />
+          </div>
+        )}
 
-            {currentView === 'logger' && activeSession && (
-              <ExerciseLogger
-                exercises={activeSession.exercises}
-                templateReference={activeSession.templateReference}
-                onComplete={handleCompleteSession}
-                onSessionCreated={handleSessionCreated}
-              />
-            )}
+        {/* Other Views */}
+        {currentView !== 'logger' && (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentView}
+              {...pageTransition}
+            >
+              {currentView === 'home' && (
+                <SessionPlanner key={sessionPlannerKey} onStartSession={handleStartSession} />
+              )}
 
-            {currentView === 'logger' && !activeSession && selectedExercises.length > 0 && (
-              <ExerciseLogger
-                exercises={selectedExercises}
-                templateReference={templateReference}
-                onComplete={handleCompleteSession}
-                onSessionCreated={handleSessionCreated}
-              />
-            )}
+              {currentView === 'history' && (
+                <SessionHistory
+                  onDoItAgain={handleDoItAgain}
+                  initialExpandedSessionId={completedSessionId}
+                  onClearExpandedSession={() => setCompletedSessionId(null)}
+                />
+              )}
 
-            {currentView === 'history' && (
-              <SessionHistory
-                onDoItAgain={handleDoItAgain}
-                initialExpandedSessionId={completedSessionId}
-                onClearExpandedSession={() => setCompletedSessionId(null)}
-              />
-            )}
+              {currentView === 'progress' && (
+                <Progress />
+              )}
 
-            {currentView === 'progress' && (
-              <Progress />
-            )}
+              {currentView === 'analyze' && (
+                <Analyze />
+              )}
 
-            {currentView === 'analyze' && (
-              <Analyze />
-            )}
-
-            {currentView === 'profile' && (
-              <Profile />
-            )}
-          </motion.div>
-        </AnimatePresence>
+              {currentView === 'profile' && (
+                <Profile />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        )}
       </main>
 
       {/* Bottom Navigation */}

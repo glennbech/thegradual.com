@@ -1,19 +1,14 @@
 /**
  * Zustand Store for TheGradual Workout App
- * Replaces: StateManager, stateService, and useStateManager hooks
- * Single source of truth with localStorage persistence and API sync
+ * CONNECTION-ONLY: DynamoDB is the single source of truth
+ * The cloud is cheap, the cloud never fails
+ * No localStorage - all operations go directly to API
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { saveUserState, fetchUserState } from '../services/apiClient';
 
-// Cache keys for localStorage
-const STORAGE_KEY = 'thegradual-workout-store';
-
-const useWorkoutStore = create(
-  persist(
-    (set, get) => ({
+const useWorkoutStore = create((set, get) => ({
       // ==========================================
       // STATE
       // ==========================================
@@ -22,8 +17,7 @@ const useWorkoutStore = create(
       customExercises: [],
       customTemplates: [],
       isOnline: navigator.onLine,
-      lastSync: null,
-      isSyncing: false,
+      isLoading: false, // Track loading state for API operations
 
       // ==========================================
       // SESSION ACTIONS
@@ -31,9 +25,15 @@ const useWorkoutStore = create(
 
       /**
        * Start a new workout session
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       startSession: async (exercises, templateReference = null) => {
+        if (!get().isOnline) {
+          throw new Error('Cannot start session while offline');
+        }
+
+        set({ isLoading: true });
+
         const newSession = {
           id: `session-${Date.now()}`,
           exercises: exercises.map((ex) => ({
@@ -45,34 +45,47 @@ const useWorkoutStore = create(
           templateReference,
           status: 'active',
           currentExerciseIndex: 0,
+          triggerRestTimerTimestamp: null,
         };
 
-        // Update local state immediately (optimistic update)
-        set({ activeSession: newSession });
-
-        // Persist to API IMMEDIATELY
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Session started and synced to API');
-        } catch (error) {
-          console.error('[workoutStore] Failed to sync new session:', error);
-          // Keep local state even if API fails
-        }
+          // Save to API FIRST
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: newSession,
+          });
 
-        return newSession;
+          // Only update local state after successful API save
+          set({ activeSession: newSession, isLoading: false });
+          console.log('[workoutStore] Session started and saved to DynamoDB');
+          return newSession;
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to save session to API:', error);
+          throw error;
+        }
       },
 
       /**
        * Complete active session (move to history)
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       completeSession: async () => {
-        const { activeSession, sessions } = get();
+        const { activeSession, sessions, isOnline } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot complete session while offline');
+        }
 
         if (!activeSession) {
           console.warn('[workoutStore] No active session to complete');
           return null;
         }
+
+        set({ isLoading: true });
 
         const completedSession = {
           ...activeSession,
@@ -81,99 +94,168 @@ const useWorkoutStore = create(
           completedAt: new Date().toISOString(),
         };
 
-        // Single atomic state update (optimistic)
-        set({
-          sessions: [...sessions, completedSession],
-          activeSession: null,
-        });
-
-        // Persist to API IMMEDIATELY (blocking)
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Session completed and synced to API');
-        } catch (error) {
-          console.error('[workoutStore] Failed to sync completed session:', error);
-          // Keep local state even if API fails
-        }
+          // Save to API FIRST
+          const state = get();
+          await saveUserState({
+            sessions: [...state.sessions, completedSession],
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: null,
+          });
 
-        return completedSession;
+          // Only update local state after successful API save
+          set({
+            sessions: [...sessions, completedSession],
+            activeSession: null,
+            isLoading: false,
+          });
+          console.log('[workoutStore] Session completed and saved to DynamoDB');
+          return completedSession;
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to save completed session:', error);
+          throw error;
+        }
       },
 
       /**
        * Update active session (e.g., add/update sets)
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       updateActiveSession: async (updates) => {
-        const { activeSession } = get();
+        const { activeSession, isOnline } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot update session while offline');
+        }
 
         if (!activeSession) {
           console.warn('[workoutStore] No active session to update');
           return null;
         }
 
+        set({ isLoading: true });
+
         const updatedSession = { ...activeSession, ...updates };
-        set({ activeSession: updatedSession });
 
-        // Persist to API IMMEDIATELY (even for single set updates)
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Active session updated and synced to API');
-        } catch (error) {
-          console.error('[workoutStore] Failed to sync session update:', error);
-          // Keep local state even if API fails
-        }
+          // Save to API FIRST
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: updatedSession,
+          });
 
-        return updatedSession;
+          // Only update local state after successful API save
+          set({ activeSession: updatedSession, isLoading: false });
+          console.log('[workoutStore] Active session updated and saved to DynamoDB');
+          return updatedSession;
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to save session update:', error);
+          throw error;
+        }
       },
 
       /**
        * Clear/cancel active session
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       clearActiveSession: async () => {
-        set({ activeSession: null });
+        const { isOnline } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot clear session while offline');
+        }
+
+        set({ isLoading: true });
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Active session cleared and synced to API');
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: null,
+          });
+
+          set({ activeSession: null, isLoading: false });
+          console.log('[workoutStore] Active session cleared and saved to DynamoDB');
         } catch (error) {
-          console.error('[workoutStore] Failed to sync session clear:', error);
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to clear session:', error);
+          throw error;
         }
       },
 
       /**
        * Update a completed session (e.g., edit sets)
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       updateSession: async (sessionId, updates) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, ...updates } : s
-          ),
-        }));
+        const { isOnline, sessions } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot update session while offline');
+        }
+
+        set({ isLoading: true });
+
+        const updatedSessions = sessions.map((s) =>
+          s.id === sessionId ? { ...s, ...updates } : s
+        );
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Session updated and synced to API');
+          const state = get();
+          await saveUserState({
+            sessions: updatedSessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+          });
+
+          set({ sessions: updatedSessions, isLoading: false });
+          console.log('[workoutStore] Session updated and saved to DynamoDB');
         } catch (error) {
-          console.error('[workoutStore] Failed to sync session update:', error);
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to update session:', error);
+          throw error;
         }
       },
 
       /**
        * Delete a session from history
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       deleteSession: async (sessionId) => {
-        set((state) => ({
-          sessions: state.sessions.filter((s) => s.id !== sessionId),
-        }));
+        const { isOnline, sessions } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot delete session while offline');
+        }
+
+        set({ isLoading: true });
+
+        const updatedSessions = sessions.filter((s) => s.id !== sessionId);
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Session deleted and synced to API');
+          const state = get();
+          await saveUserState({
+            sessions: updatedSessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+          });
+
+          set({ sessions: updatedSessions, isLoading: false });
+          console.log('[workoutStore] Session deleted and saved to DynamoDB');
         } catch (error) {
-          console.error('[workoutStore] Failed to sync session deletion:', error);
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to delete session:', error);
+          throw error;
         }
       },
 
@@ -216,43 +298,74 @@ const useWorkoutStore = create(
 
       /**
        * Add custom exercise
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       addCustomExercise: async (exercise) => {
+        const { isOnline, customExercises } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot add exercise while offline');
+        }
+
+        set({ isLoading: true });
+
         const newExercise = {
           ...exercise,
           id: exercise.id || `custom-${Date.now()}`,
           isCustom: true,
         };
 
-        set((state) => ({
-          customExercises: [...state.customExercises, newExercise],
-        }));
+        const updatedExercises = [...customExercises, newExercise];
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Custom exercise added and synced to API');
-        } catch (error) {
-          console.error('[workoutStore] Failed to sync custom exercise:', error);
-        }
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: updatedExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+          });
 
-        return newExercise;
+          set({ customExercises: updatedExercises, isLoading: false });
+          console.log('[workoutStore] Custom exercise added and saved to DynamoDB');
+          return newExercise;
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to add custom exercise:', error);
+          throw error;
+        }
       },
 
       /**
        * Delete custom exercise
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       deleteCustomExercise: async (exerciseId) => {
-        set((state) => ({
-          customExercises: state.customExercises.filter((e) => e.id !== exerciseId),
-        }));
+        const { isOnline, customExercises } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot delete exercise while offline');
+        }
+
+        set({ isLoading: true });
+
+        const updatedExercises = customExercises.filter((e) => e.id !== exerciseId);
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Custom exercise deleted and synced to API');
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: updatedExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+          });
+
+          set({ customExercises: updatedExercises, isLoading: false });
+          console.log('[workoutStore] Custom exercise deleted and saved to DynamoDB');
         } catch (error) {
-          console.error('[workoutStore] Failed to sync exercise deletion:', error);
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to delete exercise:', error);
+          throw error;
         }
       },
 
@@ -269,62 +382,109 @@ const useWorkoutStore = create(
 
       /**
        * Add custom template
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       addCustomTemplate: async (template) => {
+        const { isOnline, customTemplates } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot add template while offline');
+        }
+
+        set({ isLoading: true });
+
         const newTemplate = {
           ...template,
           id: template.id || `custom-template-${Date.now()}`,
           isCustom: true,
         };
 
-        set((state) => ({
-          customTemplates: [...state.customTemplates, newTemplate],
-        }));
+        const updatedTemplates = [...customTemplates, newTemplate];
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Custom template added and synced to API');
-        } catch (error) {
-          console.error('[workoutStore] Failed to sync custom template:', error);
-        }
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: updatedTemplates,
+            activeSession: state.activeSession,
+          });
 
-        return newTemplate;
+          set({ customTemplates: updatedTemplates, isLoading: false });
+          console.log('[workoutStore] Custom template added and saved to DynamoDB');
+          return newTemplate;
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to add custom template:', error);
+          throw error;
+        }
       },
 
       /**
        * Update custom template
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       updateCustomTemplate: async (templateId, updates) => {
-        set((state) => ({
-          customTemplates: state.customTemplates.map((t) =>
-            t.id === templateId ? { ...t, ...updates } : t
-          ),
-        }));
+        const { isOnline, customTemplates } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot update template while offline');
+        }
+
+        set({ isLoading: true });
+
+        const updatedTemplates = customTemplates.map((t) =>
+          t.id === templateId ? { ...t, ...updates } : t
+        );
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Custom template updated and synced to API');
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: updatedTemplates,
+            activeSession: state.activeSession,
+          });
+
+          set({ customTemplates: updatedTemplates, isLoading: false });
+          console.log('[workoutStore] Custom template updated and saved to DynamoDB');
         } catch (error) {
-          console.error('[workoutStore] Failed to sync template update:', error);
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to update custom template:', error);
+          throw error;
         }
       },
 
       /**
        * Delete custom template
-       * IMMEDIATE PERSISTENCE: Waits for API confirmation before returning
+       * API-FIRST: Saves to DynamoDB before updating local state
        */
       deleteCustomTemplate: async (templateId) => {
-        set((state) => ({
-          customTemplates: state.customTemplates.filter((t) => t.id !== templateId),
-        }));
+        const { isOnline, customTemplates } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot delete template while offline');
+        }
+
+        set({ isLoading: true });
+
+        const updatedTemplates = customTemplates.filter((t) => t.id !== templateId);
 
         try {
-          await get().syncToAPI();
-          console.log('[workoutStore] Custom template deleted and synced to API');
+          const state = get();
+          await saveUserState({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: updatedTemplates,
+            activeSession: state.activeSession,
+          });
+
+          set({ customTemplates: updatedTemplates, isLoading: false });
+          console.log('[workoutStore] Custom template deleted and saved to DynamoDB');
         } catch (error) {
-          console.error('[workoutStore] Failed to sync template deletion:', error);
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to delete custom template:', error);
+          throw error;
         }
       },
 
@@ -336,71 +496,15 @@ const useWorkoutStore = create(
       },
 
       // ==========================================
-      // SYNC & PERSISTENCE
+      // DATA LOADING & CONNECTION
       // ==========================================
-
-      /**
-       * Sync state to API (debounced by Zustand)
-       */
-      syncToAPI: async () => {
-        const { isOnline, isSyncing } = get();
-
-        // Skip if offline or already syncing
-        if (!isOnline) {
-          console.warn('[workoutStore] Skipping sync - offline');
-          return;
-        }
-
-        if (isSyncing) {
-          console.warn('[workoutStore] Skipping sync - already syncing');
-          return;
-        }
-
-        set({ isSyncing: true });
-
-        try {
-          const state = get();
-
-          console.log('[workoutStore] 📤 Syncing to API...', {
-            sessions: state.sessions.length,
-            customExercises: state.customExercises.length,
-            customTemplates: state.customTemplates.length,
-            hasActiveSession: !!state.activeSession,
-          });
-
-          await saveUserState({
-            sessions: state.sessions,
-            customExercises: state.customExercises,
-            customTemplates: state.customTemplates,
-            activeSession: state.activeSession,
-          });
-
-          console.log('[workoutStore] ✅ Sync successful');
-          set({ lastSync: new Date(), isSyncing: false });
-        } catch (error) {
-          console.error('[workoutStore] ❌ API sync failed:', error);
-          set({ isSyncing: false });
-          // Don't throw - localStorage is already updated by persistence middleware
-        }
-      },
 
       /**
        * Set online status
        */
       setOnlineStatus: (isOnline) => {
         set({ isOnline });
-
-        // If coming back online, sync to API
-        if (isOnline) {
-          get().syncToAPI();
-        }
-      },
-
-      /**
-       * Get last sync time
-       */
-      getLastSyncTime: () => {
-        return get().lastSync;
+        console.log('[workoutStore] Online status:', isOnline);
       },
 
       /**
@@ -411,78 +515,64 @@ const useWorkoutStore = create(
       },
 
       /**
-       * Load fresh data from API (used on login)
-       * DynamoDB is master - ALWAYS overwrites localStorage
+       * Load fresh data from API
+       * DynamoDB is the single source of truth
        * Returns { success: boolean, error?: string}
        */
       loadFromAPI: async () => {
-        console.log('[workoutStore] 📥 Loading data from API (DynamoDB is master)...');
+        console.log('[workoutStore] 📥 Loading data from DynamoDB...');
+
+        set({ isLoading: true });
 
         try {
           const data = await fetchUserState();
 
           if (data) {
-            // DynamoDB has data - overwrite localStorage
             set({
               sessions: data.sessions || [],
               activeSession: data.activeSession || null,
               customExercises: data.customExercises || [],
               customTemplates: data.customTemplates || [],
-              lastSync: new Date(),
+              isLoading: false,
             });
 
-            console.log('[workoutStore] ✅ Loaded data from API:', {
+            console.log('[workoutStore] ✅ Loaded data from DynamoDB:', {
               sessions: (data.sessions || []).length,
               customExercises: (data.customExercises || []).length,
               customTemplates: (data.customTemplates || []).length,
             });
             return { success: true };
           } else {
-            // DynamoDB is empty - clear localStorage (new user or reset)
-            console.warn('[workoutStore] ⚠️ DynamoDB empty - clearing localStorage');
+            // DynamoDB is empty - new user
             set({
               sessions: [],
               activeSession: null,
               customExercises: [],
               customTemplates: [],
-              lastSync: new Date(),
+              isLoading: false,
             });
             return { success: true };
           }
         } catch (error) {
-          console.error('[workoutStore] ❌ Failed to load from API:', error);
+          console.error('[workoutStore] ❌ Failed to load from DynamoDB:', error);
+          set({ isLoading: false });
           return { success: false, error: error.message };
         }
       },
 
       /**
-       * Clear all cached data (used on logout)
+       * Clear all in-memory data (used on logout)
        */
       clearCache: () => {
-        console.log('[workoutStore] Clearing all cached data');
+        console.log('[workoutStore] Clearing in-memory state');
         set({
           sessions: [],
           activeSession: null,
           customExercises: [],
           customTemplates: [],
-          lastSync: null,
         });
       },
-    }),
-    {
-      name: STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
-      // Only persist the data, not the sync status
-      partialize: (state) => ({
-        sessions: state.sessions,
-        activeSession: state.activeSession,
-        customExercises: state.customExercises,
-        customTemplates: state.customTemplates,
-        lastSync: state.lastSync,
-      }),
-    }
-  )
-);
+    }));
 
 // Setup online/offline listeners
 if (typeof window !== 'undefined') {
