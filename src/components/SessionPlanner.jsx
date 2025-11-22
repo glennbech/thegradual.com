@@ -5,6 +5,7 @@ import { staggerContainer, staggerItem } from '../utils/animations'
 import { headingStyles, iconSizes } from '../utils/typography'
 import { getMuscleColor } from '../utils/design-system'
 import ExerciseCard from './ExerciseCard'
+import CreateExerciseCard from './CreateExerciseCard'
 import defaultExercises from '../data/exercises.json'
 import workoutTemplates from '../data/workoutTemplates.json'
 import useWorkoutStore from '../stores/workoutStore'
@@ -654,49 +655,35 @@ export default function SessionPlanner({ onStartSession }) {
 
             <div className="p-4">
               {/* Action Buttons */}
-              <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-mono-100">
-                {/* PRIMARY: WORK OUT! Button */}
+              <div className="flex gap-2 mb-4 pb-4 border-b border-mono-100">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={handleStartSession}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors shadow-md"
+                  onClick={() => {
+                    setSelectedExercises([])
+                    setCurrentTemplate(null)
+                    setOriginalTemplate(null)
+                    setShowTemplates(true)
+                  }}
+                  className="bg-mono-200 hover:bg-mono-300 text-mono-900 py-2 px-3 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <Play className="w-5 h-5" fill="white" strokeWidth={2} />
-                  WORK OUT!
+                  <X className="w-3.5 h-3.5" strokeWidth={2} />
+                  CANCEL
                 </motion.button>
-
-                {/* SECONDARY: Save & Cancel */}
-                <div className="flex gap-2">
+                {hasTemplateChanged && (
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      setSelectedExercises([])
-                      setCurrentTemplate(null)
-                      setOriginalTemplate(null)
-                      setShowTemplates(true)
-                    }}
-                    className="bg-mono-200 hover:bg-mono-300 text-mono-900 py-2 px-3 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                    onClick={handleSaveAsTemplate}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="flex-1 bg-mono-900 hover:bg-mono-800 text-white py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <X className="w-3.5 h-3.5" strokeWidth={2} />
-                    CANCEL
+                    <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />
+                    SAVE AS TEMPLATE
                   </motion.button>
-                  {hasTemplateChanged && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleSaveAsTemplate}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="flex-1 bg-mono-900 hover:bg-mono-800 text-white py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />
-                      SAVE AS TEMPLATE
-                    </motion.button>
-                  )}
-                </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -858,16 +845,47 @@ export default function SessionPlanner({ onStartSession }) {
               animate="animate"
               className="grid gap-2 md:grid-cols-2 lg:grid-cols-3"
             >
-              {filteredExercises.map((exercise) => (
-                <motion.div key={exercise.id} variants={staggerItem}>
-                  <ExerciseCard
-                    exercise={exercise}
-                    onAdd={handleAddExercise}
-                    onDelete={exercise.isCustom ? handleRequestDeleteExercise : undefined}
-                    showDelete={exercise.isCustom}
+              {filteredExercises.length === 0 && searchTerm.trim() !== '' ? (
+                // Zero-state: Create exercise from search
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="col-span-full"
+                >
+                  <CreateExerciseCard
+                    searchTerm={searchTerm}
+                    onCreateExercise={async (newExercise) => {
+                      const addCustomExercise = useWorkoutStore.getState().addCustomExercise
+                      await addCustomExercise(newExercise)
+                      await loadExercises()
+                      setSearchTerm('') // Clear search after creation
+                    }}
                   />
                 </motion.div>
-              ))}
+              ) : filteredExercises.length === 0 ? (
+                // No search term, just show empty state
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="col-span-full text-center py-12 text-mono-500"
+                >
+                  <Dumbbell className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                  <p className="text-sm">No exercises found</p>
+                </motion.div>
+              ) : (
+                // Show exercise cards
+                filteredExercises.map((exercise) => (
+                  <motion.div key={exercise.id} variants={staggerItem}>
+                    <ExerciseCard
+                      exercise={exercise}
+                      onAdd={handleAddExercise}
+                      onDelete={exercise.isCustom ? handleRequestDeleteExercise : undefined}
+                      showDelete={exercise.isCustom}
+                    />
+                  </motion.div>
+                ))
+              )}
             </motion.div>
           </motion.div>
         )}

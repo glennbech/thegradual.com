@@ -3,10 +3,11 @@
  * CONNECTION-ONLY: DynamoDB is the single source of truth
  * The cloud is cheap, the cloud never fails
  * No localStorage - all operations go directly to API
+ * OPTIMISTIC LOCKING: Version-based concurrency control prevents data loss
  */
 
 import { create } from 'zustand';
-import { saveUserState, fetchUserState } from '../services/apiClient';
+import { saveUserState, fetchUserState, ConflictError } from '../services/apiClient';
 
 const useWorkoutStore = create((set, get) => ({
       // ==========================================
@@ -18,6 +19,50 @@ const useWorkoutStore = create((set, get) => ({
       customTemplates: [],
       isOnline: navigator.onLine,
       isLoading: false, // Track loading state for API operations
+
+      // Optimistic locking fields
+      stateVersion: 1,        // Current version from API
+      lastModified: null,     // Last modification timestamp
+      isStale: false,         // True if version conflict detected
+      conflictMessage: null,  // Error message for conflicts
+
+      // ==========================================
+      // INTERNAL HELPERS
+      // ==========================================
+
+      /**
+       * Save state with version tracking and conflict handling
+       * @private
+       */
+      _saveWithVersion: async (stateToSave) => {
+        const state = get();
+        try {
+          const result = await saveUserState({
+            version: state.stateVersion,
+            ...stateToSave,
+          });
+
+          // Update version after successful save
+          set({
+            stateVersion: result.version,
+            lastModified: result.lastModified,
+            isStale: false,
+            conflictMessage: null,
+          });
+
+          return result;
+        } catch (error) {
+          if (error instanceof ConflictError) {
+            // Version conflict detected - mark state as stale
+            set({
+              isStale: true,
+              conflictMessage: error.message,
+            });
+            console.error('[workoutStore] ⚠️ Version conflict:', error.message);
+          }
+          throw error;
+        }
+      },
 
       // ==========================================
       // SESSION ACTIONS
@@ -49,9 +94,9 @@ const useWorkoutStore = create((set, get) => ({
         };
 
         try {
-          // Save to API FIRST
+          // Save to API FIRST with version
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: state.customExercises,
             customTemplates: state.customTemplates,
@@ -95,9 +140,9 @@ const useWorkoutStore = create((set, get) => ({
         };
 
         try {
-          // Save to API FIRST
+          // Save to API FIRST with version
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: [...state.sessions, completedSession],
             customExercises: state.customExercises,
             customTemplates: state.customTemplates,
@@ -140,9 +185,9 @@ const useWorkoutStore = create((set, get) => ({
         const updatedSession = { ...activeSession, ...updates };
 
         try {
-          // Save to API FIRST
+          // Save to API FIRST with version
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: state.customExercises,
             customTemplates: state.customTemplates,
@@ -175,7 +220,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: state.customExercises,
             customTemplates: state.customTemplates,
@@ -210,7 +255,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: updatedSessions,
             customExercises: state.customExercises,
             customTemplates: state.customTemplates,
@@ -243,7 +288,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: updatedSessions,
             customExercises: state.customExercises,
             customTemplates: state.customTemplates,
@@ -299,9 +344,10 @@ const useWorkoutStore = create((set, get) => ({
       /**
        * Add custom exercise
        * API-FIRST: Saves to DynamoDB before updating local state
+       * Uses optimistic locking to prevent conflicts
        */
       addCustomExercise: async (exercise) => {
-        const { isOnline, customExercises } = get();
+        const { isOnline, customExercises, stateVersion } = get();
 
         if (!isOnline) {
           throw new Error('Cannot add exercise while offline');
@@ -319,7 +365,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: updatedExercises,
             customTemplates: state.customTemplates,
@@ -353,7 +399,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: updatedExercises,
             customTemplates: state.customTemplates,
@@ -403,7 +449,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: state.customExercises,
             customTemplates: updatedTemplates,
@@ -439,7 +485,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: state.customExercises,
             customTemplates: updatedTemplates,
@@ -472,7 +518,7 @@ const useWorkoutStore = create((set, get) => ({
 
         try {
           const state = get();
-          await saveUserState({
+          await state._saveWithVersion({
             sessions: state.sessions,
             customExercises: state.customExercises,
             customTemplates: updatedTemplates,
@@ -533,22 +579,31 @@ const useWorkoutStore = create((set, get) => ({
               activeSession: data.activeSession || null,
               customExercises: data.customExercises || [],
               customTemplates: data.customTemplates || [],
+              stateVersion: data.version || 1,
+              lastModified: data.lastModified || null,
+              isStale: false,
+              conflictMessage: null,
               isLoading: false,
             });
 
             console.log('[workoutStore] ✅ Loaded data from DynamoDB:', {
+              version: data.version,
               sessions: (data.sessions || []).length,
               customExercises: (data.customExercises || []).length,
               customTemplates: (data.customTemplates || []).length,
             });
             return { success: true };
           } else {
-            // DynamoDB is empty - new user
+            // DynamoDB is empty - new user (version 1)
             set({
               sessions: [],
               activeSession: null,
               customExercises: [],
               customTemplates: [],
+              stateVersion: 1,
+              lastModified: null,
+              isStale: false,
+              conflictMessage: null,
               isLoading: false,
             });
             return { success: true };

@@ -13,6 +13,8 @@ const API_TIMEOUT = 10000; // 10 seconds
  * User state structure matching DynamoDB schema
  * @typedef {Object} UserState
  * @property {string} uuid - User identifier
+ * @property {number} version - Version number for optimistic locking
+ * @property {string} lastModified - ISO timestamp of last modification
  * @property {Array} sessions - Workout sessions
  * @property {Array} customExercises - User-created exercises
  * @property {Array} customTemplates - Modified templates
@@ -21,8 +23,20 @@ const API_TIMEOUT = 10000; // 10 seconds
  */
 
 /**
+ * API Error for version conflicts (409)
+ */
+export class ConflictError extends Error {
+  constructor(message, currentVersion) {
+    super(message);
+    this.name = 'ConflictError';
+    this.currentVersion = currentVersion;
+    this.statusCode = 409;
+  }
+}
+
+/**
  * Fetch user state from API
- * @returns {Promise<UserState|null>} User state or null if not found
+ * @returns {Promise<UserState|null>} User state with version or null if empty
  */
 export async function fetchUserState() {
   const userId = getUserId();
@@ -50,6 +64,8 @@ export async function fetchUserState() {
     // Lambda returns JSON strings - parse them back into objects
     const parsedData = {
       uuid: data.uuid,
+      version: data.version || 1,  // Version for optimistic locking
+      lastModified: data.lastModified || '',
       sessions: JSON.parse(data.sessions || '[]'),
       customExercises: JSON.parse(data.customExercises || '[]'),
       customTemplates: JSON.parse(data.customTemplates || '[]'),
@@ -65,7 +81,17 @@ export async function fetchUserState() {
       !parsedData.activeSession;
 
     if (isEmpty) {
-      return null;
+      // Return empty state with version 1 (ready for first save)
+      return {
+        uuid: userId,
+        version: 1,
+        lastModified: '',
+        sessions: [],
+        customExercises: [],
+        customTemplates: [],
+        activeSession: null,
+        lastUpdated: '',
+      };
     }
 
     return parsedData;
@@ -80,13 +106,15 @@ export async function fetchUserState() {
 }
 
 /**
- * Save user state to API
+ * Save user state to API with optimistic locking
  * @param {Object} state - User state to save
+ * @param {number} state.version - Current version (for optimistic locking)
  * @param {Array} state.sessions - Workout sessions
  * @param {Array} state.customExercises - User-created exercises
  * @param {Array} state.customTemplates - Modified templates
  * @param {Object|null} state.activeSession - Current workout
- * @returns {Promise<UserState>} Saved user state
+ * @returns {Promise<Object>} Response with new version
+ * @throws {ConflictError} If version conflict detected (409)
  */
 export async function saveUserState(state) {
   const userId = getUserId();
@@ -94,6 +122,7 @@ export async function saveUserState(state) {
   // Build UserState object - Lambda expects JSON strings, not objects!
   const userState = {
     uuid: userId,
+    version: state.version || 1,  // Send current version for optimistic locking
     sessions: JSON.stringify(state.sessions || []),
     customExercises: JSON.stringify(state.customExercises || []),
     customTemplates: JSON.stringify(state.customTemplates || []),
@@ -116,16 +145,28 @@ export async function saveUserState(state) {
 
     clearTimeout(timeoutId);
 
+    // Handle 409 Conflict (version mismatch)
+    if (response.status === 409) {
+      const errorData = await response.json();
+      throw new ConflictError(
+        errorData.message || 'Data was modified elsewhere',
+        errorData.currentVersion
+      );
+    }
+
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    return data;
+    return data;  // Contains { uuid, status, message, version, lastModified }
   } catch (error) {
     if (error.name === 'AbortError') {
       console.error('API request timeout');
       throw new Error('Request timeout - please check your connection');
+    }
+    if (error instanceof ConflictError) {
+      throw error;  // Re-throw conflicts
     }
     console.error('Error saving user state:', error);
     throw error;

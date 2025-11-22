@@ -14,6 +14,7 @@ import AuthButton from './components/AuthButton'
 import WelcomeOnboardingModal from './components/WelcomeOnboardingModal'
 import LandingPage from './components/LandingPage'
 import ConnectionLostModal from './components/ConnectionLostModal'
+import ConflictModal from './components/ConflictModal'
 import ActiveSessionHeader from './components/ActiveSessionHeader'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getUserId } from './utils/userManager'
@@ -351,6 +352,9 @@ function AppContent() {
 
       {/* Welcome Onboarding Modal (for new users) */}
       <WelcomeOnboardingModal />
+
+      {/* Conflict Modal - Shows when version conflict detected */}
+      <ConflictModal />
     </div>
   )
 }
