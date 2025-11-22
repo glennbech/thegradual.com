@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy, Activity } from 'lucide-react'
+import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy, Activity, Pencil } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { pageTransition } from './utils/animations'
 import SessionPlanner from './components/SessionPlanner'
+import Plan from './components/Plan'
 import SessionContainer from './components/SessionContainer'
 import SessionHistory from './components/SessionHistory'
 import Profile from './components/Profile'
-import Progress from './components/Progress'
 import Analyze from './components/Analyze'
 import TransferConfirmation from './components/TransferConfirmation'
 import AuthButton from './components/AuthButton'
@@ -39,6 +39,7 @@ function AppContent() {
   const [sessionPlannerKey, setSessionPlannerKey] = useState(0)
   const [completedSessionId, setCompletedSessionId] = useState(null) // Track just-completed session
   const [transferUserId, setTransferUserId] = useState(null) // Transfer from another device
+  const [templateToEdit, setTemplateToEdit] = useState(null) // Template being edited in Plan page
   const userId = getUserId() // Get or create user UUID
 
   // Load data from DynamoDB when user is authenticated
@@ -126,6 +127,11 @@ function AppContent() {
     window.history.pushState({ view: 'logger' }, '', window.location.pathname)
   }
 
+  const handleEditTemplate = (template) => {
+    setTemplateToEdit(template)
+    setCurrentView('plan')
+    window.history.pushState({ view: 'plan' }, '', window.location.pathname)
+  }
 
   const handleDiscardSession = async () => {
     // For discard from ExerciseLogger - navigates to home
@@ -167,10 +173,10 @@ function AppContent() {
 
   const navItems = [
     { id: 'home', label: 'Work Out', icon: Plus },
+    { id: 'plan', label: 'Plan', icon: Pencil },
     { id: 'history', label: 'History', icon: Calendar },
-    { id: 'progress', label: 'Progress', icon: TrendingUp },
     { id: 'analyze', label: 'Analyze', icon: Activity },
-    { id: 'profile', label: 'Profile', icon: User }, // Replaced Health with Profile
+    { id: 'profile', label: 'Profile', icon: User },
   ]
 
   // Show landing page if not authenticated
@@ -279,7 +285,19 @@ function AppContent() {
               {...pageTransition}
             >
               {currentView === 'home' && (
-                <SessionPlanner key={sessionPlannerKey} onStartSession={handleStartSession} />
+                <SessionPlanner
+                  key={sessionPlannerKey}
+                  onStartSession={handleStartSession}
+                  onEditTemplate={handleEditTemplate}
+                />
+              )}
+
+              {currentView === 'plan' && (
+                <Plan
+                  onStartSession={handleStartSession}
+                  editTemplate={templateToEdit}
+                  onEditComplete={() => setTemplateToEdit(null)}
+                />
               )}
 
               {currentView === 'history' && (
@@ -288,10 +306,6 @@ function AppContent() {
                   initialExpandedSessionId={completedSessionId}
                   onClearExpandedSession={() => setCompletedSessionId(null)}
                 />
-              )}
-
-              {currentView === 'progress' && (
-                <Progress />
               )}
 
               {currentView === 'analyze' && (

@@ -1,13 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * BubbleCalendar - Monthly calendar heatmap with bubble visualization
  * Bubbles vary in size (workout intensity) and color (workout frequency)
  * Strava-inspired design with monthly sections
  */
-export default function BubbleCalendar({ sessions, selectedMonth }) {
+export default function BubbleCalendar({ sessions }) {
+  // State for selected month (default to current month)
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(null);
 
   // Calculate daily volume organized by month
   const monthlyData = useMemo(() => {
@@ -82,13 +84,26 @@ export default function BubbleCalendar({ sessions, selectedMonth }) {
     return months;
   }, [sessions]);
 
+  // Initialize selectedMonthIndex to last month (current)
+  const currentMonthIndex = selectedMonthIndex !== null
+    ? selectedMonthIndex
+    : monthlyData.length - 1;
+
   // Show only the selected month
-  const displayedMonths = useMemo(() => {
-    if (!selectedMonth) return monthlyData.slice(-1); // Default to current month
-    return monthlyData.filter(m =>
-      m.month === selectedMonth.month && m.year === selectedMonth.year
-    );
-  }, [monthlyData, selectedMonth]);
+  const displayedMonth = monthlyData[currentMonthIndex];
+
+  // Navigation handlers
+  const handlePrevMonth = () => {
+    if (currentMonthIndex > 0) {
+      setSelectedMonthIndex(currentMonthIndex - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonthIndex < monthlyData.length - 1) {
+      setSelectedMonthIndex(currentMonthIndex + 1);
+    }
+  };
 
   // Calculate stats and max volume for relative sizing
   const stats = useMemo(() => {
@@ -120,9 +135,9 @@ export default function BubbleCalendar({ sessions, selectedMonth }) {
     if (volume === 0) return '0.25rem';  // 4px - rest day
 
     // Use log scale: log(volume + 1) / log(maxVolume + 1)
-    // Maps to 0.375rem (6px) to 1.125rem (18px) range - more compact
-    const minSize = 0.375;   // rem
-    const maxSize = 1.125;   // rem
+    // Maps to 0.35rem (5.6px) to 0.875rem (14px) range - compact but readable
+    const minSize = 0.35;    // rem
+    const maxSize = 0.875;   // rem
     const normalizedVolume = maxVolume > 0
       ? Math.log(volume + 1) / Math.log(maxVolume + 1)
       : 0;
@@ -165,64 +180,84 @@ export default function BubbleCalendar({ sessions, selectedMonth }) {
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+  if (!displayedMonth) {
+    return null;
+  }
+
   return (
-    <div className="bg-white border-2 border-mono-200 p-3">
-      {/* Compact Header */}
-      <div className="mb-2">
-        <h3 className="text-sm font-bold text-mono-900 uppercase tracking-tight mb-2">
-          {displayedMonths.length > 0 ? displayedMonths[0].label : 'Activity'}
-        </h3>
-        {/* Vertical compact stats */}
-        <div className="flex gap-4 text-[10px] mb-2">
-          <div>
-            <div className="text-mono-500 uppercase">Vol</div>
-            <div className="font-bold text-mono-900">{Math.round(stats.totalVolume / 1000)}k</div>
+    <div className="bg-white border-2 border-mono-200 p-2">
+      {/* Header with Month Navigation */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handlePrevMonth}
+            disabled={currentMonthIndex === 0}
+            className="p-0.5 hover:bg-mono-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5 text-mono-900" strokeWidth={2.5} />
+          </button>
+          <h3 className="text-xs font-bold text-mono-900 uppercase tracking-tight min-w-[90px] text-center">
+            {displayedMonth.label}
+          </h3>
+          <button
+            onClick={handleNextMonth}
+            disabled={currentMonthIndex === monthlyData.length - 1}
+            className="p-0.5 hover:bg-mono-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5 text-mono-900" strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* Compact Inline Stats */}
+        <div className="flex gap-2 text-[9px]">
+          <div className="text-right">
+            <div className="text-mono-500 uppercase leading-none">Vol</div>
+            <div className="font-bold text-mono-900 leading-none mt-0.5">{Math.round(stats.totalVolume / 1000)}k</div>
           </div>
-          <div>
-            <div className="text-mono-500 uppercase">Days</div>
-            <div className="font-bold text-mono-900">{stats.daysWithWorkouts}</div>
+          <div className="text-right">
+            <div className="text-mono-500 uppercase leading-none">Days</div>
+            <div className="font-bold text-mono-900 leading-none mt-0.5">{stats.daysWithWorkouts}</div>
           </div>
-          <div>
-            <div className="text-mono-500 uppercase">Streak</div>
-            <div className="font-bold text-mono-900">{stats.currentStreak}</div>
+          <div className="text-right">
+            <div className="text-mono-500 uppercase leading-none">Str</div>
+            <div className="font-bold text-mono-900 leading-none mt-0.5">{stats.currentStreak}</div>
           </div>
         </div>
       </div>
 
-      {/* Compact Monthly Bubble Calendars */}
-      <div className="space-y-3">
-        {displayedMonths.map((month, monthIndex) => (
-          <motion.div
-            key={`${month.year}-${month.month}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: monthIndex * 0.1 }}
-          >
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1.5">
-              {/* Day Labels */}
-              {dayLabels.map((label, i) => (
-                <div
-                  key={i}
-                  className="text-center text-[10px] text-mono-400 font-medium pb-0.5"
-                >
-                  {label}
-                </div>
-              ))}
+      {/* Compact Monthly Bubble Calendar */}
+      <motion.div
+        key={`${displayedMonth.year}-${displayedMonth.month}`}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        transition={{ duration: 0.2 }}
+      >
+        {/* Calendar Grid - Compact with slightly more breathing room */}
+        <div className="grid grid-cols-7 gap-1.5">
+          {/* Day Labels */}
+          {dayLabels.map((label, i) => (
+            <div
+              key={i}
+              className="text-center text-[9px] text-mono-400 font-medium h-3 leading-none"
+            >
+              {label}
+            </div>
+          ))}
 
-              {/* Empty cells before first day */}
-              {Array.from({ length: month.firstDayOfWeek }).map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-square" />
-              ))}
+          {/* Empty cells before first day */}
+          {Array.from({ length: displayedMonth.firstDayOfWeek }).map((_, i) => (
+            <div key={`empty-${i}`} className="h-8" />
+          ))}
 
-              {/* Day cells with bubbles */}
-              {month.days.map((day, dayIndex) => (
+          {/* Day cells with bubbles - Fixed height with 20% more space */}
+          {displayedMonth.days.map((day, dayIndex) => (
                 <div
                   key={day.day}
-                  className="aspect-square flex flex-col items-center justify-center relative group"
+                  className="h-8 flex flex-col items-center justify-center relative group"
                 >
                   {/* Day Number */}
-                  <div className="text-[10px] font-medium text-mono-600 mb-0.5">
+                  <div className="text-[9px] font-medium text-mono-600 leading-none mb-0.5">
                     {day.day}
                   </div>
 
@@ -238,7 +273,7 @@ export default function BubbleCalendar({ sessions, selectedMonth }) {
                     }}
                     initial={{ opacity: 0, scale: 0 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: monthIndex * 0.1 + dayIndex * 0.01 }}
+                    transition={{ delay: dayIndex * 0.005 }}
                     whileHover={{ scale: 1.25 }}
                   />
 
@@ -251,12 +286,10 @@ export default function BubbleCalendar({ sessions, selectedMonth }) {
                       </div>
                     </div>
                   )}
-                </div>
-              ))}
             </div>
-          </motion.div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </motion.div>
     </div>
   );
 }

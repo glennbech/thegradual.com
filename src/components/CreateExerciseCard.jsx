@@ -1,16 +1,14 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Sparkles, ChevronDown } from 'lucide-react'
+import { Plus, Sparkles } from 'lucide-react'
 import { getMuscleColor } from '../utils/design-system'
 import { headingStyles } from '../utils/typography'
 
 export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
-  const [category, setCategory] = useState('chest')
   const [muscleGroup, setMuscleGroup] = useState('chest')
 
-  const categories = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
   const muscleGroups = [
     { value: 'chest', label: 'Chest' },
     { value: 'back', label: 'Back' },
@@ -25,6 +23,9 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
 
     setIsCreating(true)
     try {
+      // Capitalize first letter for category
+      const category = muscleGroup.charAt(0).toUpperCase() + muscleGroup.slice(1)
+
       const newExercise = {
         name: searchTerm.trim(),
         category,
@@ -34,7 +35,6 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
       await onCreateExercise(newExercise)
       // Reset state
       setIsExpanded(false)
-      setCategory('chest')
       setMuscleGroup('chest')
     } catch (error) {
       console.error('Failed to create exercise:', error)
@@ -44,7 +44,7 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
     }
   }
 
-  const muscleColor = getMuscleColor(category.toLowerCase())
+  const muscleColor = getMuscleColor(muscleGroup)
 
   return (
     <motion.div
@@ -115,30 +115,6 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
               transition={{ duration: 0.3, ease: 'easeOut' }}
               className="space-y-4"
             >
-              {/* Category Selection */}
-              <div>
-                <label className={`block ${headingStyles.label} mb-2`}>
-                  Category *
-                </label>
-                <div className="relative">
-                  <select
-                    value={category}
-                    onChange={(e) => {
-                      setCategory(e.target.value)
-                      setMuscleGroup(e.target.value.toLowerCase())
-                    }}
-                    className="w-full px-4 py-3 pr-10 border border-mono-200 bg-white text-mono-900 focus:border-mono-900 focus:outline-none transition-colors appearance-none"
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-mono-400 pointer-events-none" />
-                </div>
-              </div>
-
               {/* Muscle Group Grid */}
               <div>
                 <label className={`block ${headingStyles.label} mb-3`}>

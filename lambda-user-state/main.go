@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -23,6 +25,8 @@ var (
 // Note: DynamoDB may have binary OR string data (migration from old format)
 type UserState struct {
 	UUID             string `json:"uuid" dynamodbav:"uuid"`
+	Version          int64  `json:"version" dynamodbav:"version"`
+	LastModified     string `json:"lastModified" dynamodbav:"lastModified"`
 	Sessions         string `json:"sessions,omitempty" dynamodbav:"sessions,omitempty"`
 	CustomExercises  string `json:"customExercises,omitempty" dynamodbav:"customExercises,omitempty"`
 	CustomTemplates  string `json:"customTemplates,omitempty" dynamodbav:"customTemplates,omitempty"`
@@ -32,12 +36,14 @@ type UserState struct {
 
 // DynamoUserState handles both binary and string formats from DynamoDB
 type DynamoUserState struct {
-	UUID             string `dynamodbav:"uuid"`
+	UUID             string      `dynamodbav:"uuid"`
+	Version          int64       `dynamodbav:"version"`
+	LastModified     string      `dynamodbav:"lastModified"`
 	Sessions         interface{} `dynamodbav:"sessions,omitempty"`
 	CustomExercises  interface{} `dynamodbav:"customExercises,omitempty"`
 	CustomTemplates  interface{} `dynamodbav:"customTemplates,omitempty"`
 	ActiveSession    interface{} `dynamodbav:"activeSession,omitempty"`
-	LastUpdated      string `dynamodbav:"lastUpdated,omitempty"`
+	LastUpdated      string      `dynamodbav:"lastUpdated,omitempty"`
 }
 
 // init runs once on Lambda cold start
@@ -139,6 +145,8 @@ func handleGetState(ctx context.Context, uuid string, headers map[string]string)
 	if result.Item == nil {
 		emptyState := UserState{
 			UUID:            uuid,
+			Version:         1,
+			LastModified:    "",
 			Sessions:        "[]",
 			CustomExercises: "[]",
 			CustomTemplates: "[]",
@@ -164,11 +172,18 @@ func handleGetState(ctx context.Context, uuid string, headers map[string]string)
 	// Convert to UserState with string fields (handles both binary and string)
 	state := UserState{
 		UUID:            dynamoState.UUID,
+		Version:         dynamoState.Version,
+		LastModified:    dynamoState.LastModified,
 		Sessions:        convertToString(dynamoState.Sessions),
 		CustomExercises: convertToString(dynamoState.CustomExercises),
 		CustomTemplates: convertToString(dynamoState.CustomTemplates),
 		ActiveSession:   convertToString(dynamoState.ActiveSession),
 		LastUpdated:     dynamoState.LastUpdated,
+	}
+
+	// Migrate old records: if version is 0, set to 1
+	if state.Version == 0 {
+		state.Version = 1
 	}
 
 	body, err := json.Marshal(state)
@@ -186,44 +201,108 @@ func handleGetState(ctx context.Context, uuid string, headers map[string]string)
 	}, nil
 }
 
-// handleSaveState saves user state to DynamoDB
+// handleSaveState saves user state to DynamoDB with optimistic locking
 func handleSaveState(ctx context.Context, uuid string, body string, headers map[string]string) (events.APIGatewayProxyResponse, error) {
 	// Parse incoming JSON
-	var state UserState
-	if err := json.Unmarshal([]byte(body), &state); err != nil {
+	var incomingState UserState
+	if err := json.Unmarshal([]byte(body), &incomingState); err != nil {
 		log.Printf("JSON unmarshal error: %v", err)
 		return errorResponse(headers, 400, "Invalid JSON body")
 	}
 
 	// Ensure UUID matches path parameter
-	state.UUID = uuid
+	incomingState.UUID = uuid
+
+	// Get current state to check version
+	currentItem, err := dynamoClient.GetItemWithContext(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]*dynamodb.AttributeValue{
+			"uuid": {S: aws.String(uuid)},
+		},
+	})
+	if err != nil {
+		log.Printf("DynamoDB GetItem error during save: %v", err)
+		return errorResponse(headers, 500, "Failed to check current version")
+	}
+
+	expectedVersion := incomingState.Version
+	newVersion := expectedVersion + 1
+
+	// If this is a new user (no existing item), accept version 1
+	if currentItem.Item == nil {
+		if expectedVersion != 1 {
+			log.Printf("Conflict: New user must have version 1, got %d", expectedVersion)
+			return conflictResponse(headers, 0, "New user must start at version 1")
+		}
+		newVersion = 2 // First save creates version 2
+	} else {
+		// Existing user: verify version matches
+		var currentState DynamoUserState
+		if err := dynamodbattribute.UnmarshalMap(currentItem.Item, &currentState); err != nil {
+			log.Printf("DynamoDB unmarshal error during version check: %v", err)
+			return errorResponse(headers, 500, "Failed to parse current state")
+		}
+
+		currentVersion := currentState.Version
+		// Migrate old records without version
+		if currentVersion == 0 {
+			currentVersion = 1
+		}
+
+		// Version mismatch = conflict
+		if expectedVersion != currentVersion {
+			log.Printf("Conflict: Expected version %d, current version is %d", expectedVersion, currentVersion)
+			return conflictResponse(headers, currentVersion, "Data was modified elsewhere")
+		}
+
+		newVersion = currentVersion + 1
+	}
+
+	// Update state with new version and timestamp
+	incomingState.Version = newVersion
+	incomingState.LastModified = getCurrentTimestamp()
 
 	// Marshal to DynamoDB format
-	item, err := dynamodbattribute.MarshalMap(state)
+	item, err := dynamodbattribute.MarshalMap(incomingState)
 	if err != nil {
 		log.Printf("DynamoDB marshal error: %v", err)
 		return errorResponse(headers, 500, "Failed to prepare state")
 	}
 
-	// Put item in DynamoDB
+	// Conditional write: only succeed if version still matches
 	input := &dynamodb.PutItemInput{
 		TableName: aws.String(tableName),
 		Item:      item,
 	}
 
+	// Only add condition if not a new record
+	if currentItem.Item != nil {
+		input.ConditionExpression = aws.String("version = :expectedVersion OR attribute_not_exists(version)")
+		input.ExpressionAttributeValues = map[string]*dynamodb.AttributeValue{
+			":expectedVersion": {N: aws.String(fmt.Sprintf("%d", expectedVersion))},
+		}
+	}
+
 	_, err = dynamoClient.PutItemWithContext(ctx, input)
 	if err != nil {
+		// Check if it's a conditional check failure
+		if awsErr, ok := err.(*dynamodb.ConditionalCheckFailedException); ok {
+			log.Printf("Conditional check failed: %v", awsErr)
+			return conflictResponse(headers, 0, "Version conflict - data was modified elsewhere")
+		}
 		log.Printf("DynamoDB PutItem error: %v", err)
 		return errorResponse(headers, 500, "Failed to save state")
 	}
 
-	log.Printf("Saved state for user %s (%d bytes)", uuid, len(body))
+	log.Printf("Saved state for user %s (version %d -> %d, %d bytes)", uuid, expectedVersion, newVersion, len(body))
 
-	// Return success response
+	// Return success response with new version
 	response := map[string]interface{}{
-		"uuid":    uuid,
-		"status":  "saved",
-		"message": "State saved successfully",
+		"uuid":         uuid,
+		"status":       "saved",
+		"message":      "State saved successfully",
+		"version":      newVersion,
+		"lastModified": incomingState.LastModified,
 	}
 
 	responseBody, _ := json.Marshal(response)
@@ -537,4 +616,25 @@ func errorResponse(headers map[string]string, statusCode int, message string) (e
 		Headers:    headers,
 		Body:       string(body),
 	}, nil
+}
+
+// conflictResponse creates a 409 Conflict response for version mismatches
+func conflictResponse(headers map[string]string, currentVersion int64, message string) (events.APIGatewayProxyResponse, error) {
+	errBody := map[string]interface{}{
+		"error":          "conflict",
+		"message":        message,
+		"currentVersion": currentVersion,
+	}
+	body, _ := json.Marshal(errBody)
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: 409,
+		Headers:    headers,
+		Body:       string(body),
+	}, nil
+}
+
+// getCurrentTimestamp returns ISO 8601 formatted timestamp
+func getCurrentTimestamp() string {
+	return time.Now().UTC().Format(time.RFC3339)
 }

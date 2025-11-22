@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Trophy } from 'lucide-react';
 import useWorkoutStore from '../stores/workoutStore';
 import { getMuscleColor } from '../utils/design-system';
 import {
@@ -9,10 +9,17 @@ import {
   calculateProgressionRate,
   getStrengthLevel,
   getExercisesWithStandards,
-  getVolumeHeatmapData,
 } from '../utils/strengthCalculations';
+import {
+  getPerformedExercises,
+  getExerciseStats,
+  calculateTrend,
+  getPersonalRecords
+} from '../utils/progressCalculations';
 import StrengthChart from './StrengthChart';
-import VolumeHeatmap from './VolumeHeatmap';
+import ExerciseProgressCard from './ExerciseProgressCard';
+import ExerciseProgressDetail from './ExerciseProgressDetail';
+import Achievements from './Achievements';
 import { pageTransition, staggerContainer, staggerItem } from '../utils/animations';
 import defaultExercises from '../data/exercises.json';
 
@@ -22,6 +29,12 @@ import defaultExercises from '../data/exercises.json';
 export default function Analyze() {
   const { sessions } = useWorkoutStore();
   const [expandedExerciseId, setExpandedExerciseId] = useState(null);
+  const [selectedExercise, setSelectedExercise] = useState(null);
+  const [selectedStats, setSelectedStats] = useState(null);
+
+  // Get custom exercises from store
+  const customExercises = useWorkoutStore((state) => state.getCustomExercises());
+  const exercises = useMemo(() => [...defaultExercises, ...customExercises], [customExercises]);
 
   // Get exercises that have strength standards defined
   const exercisesWithStandards = useMemo(() => {
@@ -57,10 +70,34 @@ export default function Analyze() {
     return analytics.sort((a, b) => b.latest.e1rm - a.latest.e1rm);
   }, [sessions, exercisesWithStandards]);
 
-  // Volume heatmap data
-  const volumeData = useMemo(() => {
-    return getVolumeHeatmapData(sessions, 90);
-  }, [sessions]);
+  // Calculate personal records
+  const personalRecords = useMemo(() => {
+    if (!sessions || sessions.length === 0) return [];
+    const completedSessions = sessions.filter(s => s.status === 'completed');
+    return getPersonalRecords(completedSessions, exercises);
+  }, [sessions, exercises]);
+
+  // Get exercises that have been performed (for exercise progress cards)
+  const performedExercises = useMemo(() => {
+    if (!sessions || sessions.length === 0) return [];
+    const completedSessions = sessions.filter(s => s.status === 'completed');
+    const performedIds = getPerformedExercises(completedSessions);
+    return performedIds
+      .map(id => exercises.find(ex => ex.id === id))
+      .filter(Boolean);
+  }, [sessions, exercises]);
+
+  const handleExerciseClick = (exercise) => {
+    const completedSessions = sessions.filter(s => s.status === 'completed');
+    const stats = getExerciseStats(exercise.id, completedSessions);
+    setSelectedExercise(exercise);
+    setSelectedStats(stats);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedExercise(null);
+    setSelectedStats(null);
+  };
 
   // Expandable card for exercise details
   const ExerciseCard = ({ exercise, progression, latest, strengthLevel, rate }) => {
@@ -299,11 +336,61 @@ export default function Analyze() {
           Analyze
         </h1>
         <p className="text-mono-500 text-sm uppercase tracking-wide">
-          Scientific strength metrics and 1RM estimations
+          Scientific strength metrics and analytics
         </p>
       </div>
 
-      {/* Estimated 1RM Section */}
+      {/* Personal Records Section */}
+      {personalRecords.length > 0 && (
+        <motion.section variants={staggerContainer} initial="initial" animate="animate">
+          <Achievements personalRecords={personalRecords} />
+        </motion.section>
+      )}
+
+      {/* 2. Exercise Progress Section */}
+      {performedExercises.length > 0 && (
+        <motion.section variants={staggerContainer} initial="initial" animate="animate">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-mono-900 p-2">
+              <TrendingUp className="w-5 h-5 text-white" strokeWidth={2} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-mono-900 uppercase tracking-tight">
+                Exercise Progress
+              </h2>
+              <p className="text-xs text-mono-500 uppercase">
+                {performedExercises.length} exercises tracked
+              </p>
+            </div>
+          </div>
+
+          <motion.div
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
+            {performedExercises.map((exercise) => {
+              const completedSessions = sessions.filter(s => s.status === 'completed');
+              const stats = getExerciseStats(exercise.id, completedSessions);
+              const trend = calculateTrend(exercise.id, completedSessions);
+
+              return (
+                <motion.div key={exercise.id} variants={staggerItem}>
+                  <ExerciseProgressCard
+                    exercise={exercise}
+                    stats={stats}
+                    trend={trend}
+                    onClick={() => handleExerciseClick(exercise)}
+                  />
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </motion.section>
+      )}
+
+      {/* 3. Estimated 1RM Section */}
       <motion.section variants={staggerContainer} initial="initial" animate="animate">
         <motion.div variants={staggerItem}>
           <h2 className="text-xl font-bold text-mono-900 mb-4 uppercase tracking-tight">
@@ -351,6 +438,16 @@ export default function Analyze() {
           Click any exercise card to expand and see detailed progression charts and formula breakdowns.
         </p>
       </motion.section>
+
+      {/* Exercise Progress Detail Modal */}
+      {selectedExercise && selectedStats && (
+        <ExerciseProgressDetail
+          exercise={selectedExercise}
+          stats={selectedStats}
+          isOpen={!!selectedExercise}
+          onClose={handleCloseDetail}
+        />
+      )}
     </motion.div>
   );
 }
