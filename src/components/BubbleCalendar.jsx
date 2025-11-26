@@ -44,6 +44,7 @@ export default function BubbleCalendar({ sessions }) {
         date.setHours(0, 0, 0, 0);
 
         // Calculate total volume for this day (reps × weight, excluding warm-ups)
+        // Only count volume for weight+reps exercises to avoid false zeros
         const volume = completedSessions
           .filter(session => {
             const sessionDate = new Date(session.completedAt || session.createdAt);
@@ -52,9 +53,17 @@ export default function BubbleCalendar({ sessions }) {
           })
           .reduce((totalVolume, session) => {
             const sessionVolume = (session.exercises || []).reduce((exTotal, exercise) => {
+              const exerciseType = exercise.exerciseType || 'weight+reps';
               const exerciseVolume = (exercise.sets || [])
                 .filter(set => set.setType !== 'warm-up')
-                .reduce((setTotal, set) => setTotal + ((set.reps || 0) * (set.weight || 0)), 0);
+                .reduce((setTotal, set) => {
+                  // Only calculate volume for weight+reps exercises
+                  if (exerciseType === 'weight+reps') {
+                    return setTotal + ((set.reps || 0) * (set.weight || 0));
+                  }
+                  // For other types, count sets as units of work
+                  return setTotal + 1;
+                }, 0);
               return exTotal + exerciseVolume;
             }, 0);
             return totalVolume + sessionVolume;
