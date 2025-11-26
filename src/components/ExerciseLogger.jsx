@@ -191,13 +191,14 @@ export default function ExerciseLogger({
 
           // If no previous session data, create default planned sets based on exercise type
           const defaultPlannedSets = (() => {
-            if (ex.exerciseType === 'time-based') {
+            const exerciseType = ex.exerciseType || 'weight+reps'; // Fallback for old exercises
+            if (exerciseType === 'time-based') {
               return [
                 { duration: 30, completed: false, setType: 'working' },
                 { duration: 30, completed: false, setType: 'working' },
                 { duration: 30, completed: false, setType: 'working' },
               ];
-            } else if (ex.exerciseType === 'reps-only') {
+            } else if (exerciseType === 'reps-only') {
               return [
                 { reps: 10, completed: false, setType: 'working' },
                 { reps: 10, completed: false, setType: 'working' },
@@ -264,6 +265,11 @@ export default function ExerciseLogger({
 
   const currentExercise = activeSession?.exercises[currentExerciseIndex];
 
+  // Safe getter for exercise type with fallback to 'weight+reps' for backward compatibility
+  const getExerciseType = (exercise) => {
+    return exercise?.exerciseType || 'weight+reps';
+  };
+
   const handleToggleSet = (index) => {
     if (!currentExercise) {
       return;
@@ -324,9 +330,10 @@ export default function ExerciseLogger({
         completed: true, // Manually added sets are immediately completed
       };
 
-      if (currentExercise.exerciseType === 'time-based') {
+      const exerciseType = getExerciseType(currentExercise);
+      if (exerciseType === 'time-based') {
         return { ...baseSet, duration: currentSet.duration };
-      } else if (currentExercise.exerciseType === 'reps-only') {
+      } else if (exerciseType === 'reps-only') {
         return { ...baseSet, reps: currentSet.reps };
       } else {
         // weight+reps (default)
@@ -664,9 +671,9 @@ export default function ExerciseLogger({
                 key={idx}
                 className="flex-shrink-0 px-3 py-1.5 bg-white border-2 border-mono-900 text-xs"
               >
-                {currentExercise.exerciseType === 'time-based' ? (
+                {getExerciseType(currentExercise) === 'time-based' ? (
                   <span className="font-bold text-mono-900">{set.duration || 30}s</span>
-                ) : currentExercise.exerciseType === 'reps-only' ? (
+                ) : getExerciseType(currentExercise) === 'reps-only' ? (
                   <span className="font-bold text-mono-900">{set.reps} reps</span>
                 ) : (
                   <>
@@ -711,8 +718,8 @@ export default function ExerciseLogger({
                       </span>
                     </div>
 
-                    <div className={`grid ${currentExercise.exerciseType === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
-                      {currentExercise.exerciseType === 'time-based' ? (
+                    <div className={`grid ${getExerciseType(currentExercise) === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+                      {getExerciseType(currentExercise) === 'time-based' ? (
                         // Time-based: Show only duration
                         <div>
                           <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
@@ -769,7 +776,7 @@ export default function ExerciseLogger({
                           </div>
 
                           {/* Weight input - only shown for weight+reps */}
-                          {currentExercise.exerciseType === 'weight+reps' && (
+                          {getExerciseType(currentExercise) === 'weight+reps' && (
                             <div>
                               <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
                                 Weight (kg)
@@ -848,10 +855,10 @@ export default function ExerciseLogger({
                       }}
                     >
                       <p className={`text-lg font-black mb-0.5 ${set.completed ? 'text-mono-900' : 'text-mono-600'}`}>
-                        {currentExercise.exerciseType === 'time-based' ? (
+                        {getExerciseType(currentExercise) === 'time-based' ? (
                           // Time-based: Show duration only
                           `${set.duration || 30}s`
-                        ) : currentExercise.exerciseType === 'reps-only' ? (
+                        ) : getExerciseType(currentExercise) === 'reps-only' ? (
                           // Reps-only: Show reps only
                           `${set.reps} reps`
                         ) : (
@@ -863,12 +870,12 @@ export default function ExerciseLogger({
                         )}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-mono-500">
-                        {currentExercise.exerciseType === 'weight+reps' && (
+                        {getExerciseType(currentExercise) === 'weight+reps' && (
                           <span className="font-semibold">{(set.reps * set.weight).toFixed(1)}kg</span>
                         )}
                         {set.setType !== 'working' && (
                           <>
-                            {currentExercise.exerciseType === 'weight+reps' && <span>•</span>}
+                            {getExerciseType(currentExercise) === 'weight+reps' && <span>•</span>}
                             <span className="uppercase">{set.setType}</span>
                           </>
                         )}
@@ -932,8 +939,8 @@ export default function ExerciseLogger({
               </div>
 
               {/* Input fields - conditional based on exercise type */}
-              <div className={`grid ${currentExercise.exerciseType === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-                {currentExercise.exerciseType === 'time-based' ? (
+              <div className={`grid ${getExerciseType(currentExercise) === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+                {getExerciseType(currentExercise) === 'time-based' ? (
                   // Time-based: Show only duration
                   <div className="flex flex-col gap-2">
                     <label className={headingStyles.label}>Duration (seconds)</label>
@@ -972,7 +979,7 @@ export default function ExerciseLogger({
                     </div>
 
                     {/* Weight input - only shown for weight+reps */}
-                    {currentExercise.exerciseType === 'weight+reps' && (
+                    {getExerciseType(currentExercise) === 'weight+reps' && (
                       <div className="flex flex-col gap-2">
                         <label className={headingStyles.label}>Weight (kg)</label>
                         <input
