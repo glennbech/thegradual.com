@@ -8,13 +8,16 @@ import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
  * Strava-inspired design with monthly sections
  */
 export default function BubbleCalendar({ sessions }) {
+  // Early return BEFORE any hooks if no sessions
+  if (!sessions || sessions.length === 0) {
+    return null;
+  }
+
   // State for selected month (default to current month)
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(null);
 
   // Calculate daily volume organized by month
   const monthlyData = useMemo(() => {
-    if (!sessions || sessions.length === 0) return [];
-
     // Get completed sessions only
     const completedSessions = sessions.filter(s => s.status === 'completed');
 
@@ -188,10 +191,6 @@ export default function BubbleCalendar({ sessions }) {
   }
 
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-  if (!displayedMonth) {
-    return null;
-  }
 
   return (
     <div className="bg-white border-2 border-mono-200 p-2">
