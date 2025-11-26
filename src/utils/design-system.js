@@ -229,9 +229,11 @@ export const formatWeight = (weight, unit = 'kg') => {
  */
 export const calculateVolume = (sets) => {
   if (!sets || !Array.isArray(sets)) return 0;
-  return sets.reduce((total, set) => {
-    return total + (set.reps * set.weight);
-  }, 0);
+  return sets
+    .filter(set => set.completed)
+    .reduce((total, set) => {
+      return total + (set.reps * set.weight);
+    }, 0);
 };
 
 /**
@@ -275,12 +277,15 @@ export const comparePerformance = (current, previous) => {
   const previousVolume = calculateVolume(previous.sets);
   const volumeDiff = currentVolume - previousVolume;
 
-  const currentMaxWeight = Math.max(...current.sets.map(s => s.weight));
-  const previousMaxWeight = Math.max(...previous.sets.map(s => s.weight));
+  const currentCompletedSets = current.sets.filter(s => s.completed);
+  const previousCompletedSets = previous.sets.filter(s => s.completed);
+
+  const currentMaxWeight = currentCompletedSets.length > 0 ? Math.max(...currentCompletedSets.map(s => s.weight)) : 0;
+  const previousMaxWeight = previousCompletedSets.length > 0 ? Math.max(...previousCompletedSets.map(s => s.weight)) : 0;
   const weightDiff = currentMaxWeight - previousMaxWeight;
 
-  const currentTotalReps = current.sets.reduce((sum, s) => sum + s.reps, 0);
-  const previousTotalReps = previous.sets.reduce((sum, s) => sum + s.reps, 0);
+  const currentTotalReps = currentCompletedSets.reduce((sum, s) => sum + s.reps, 0);
+  const previousTotalReps = previousCompletedSets.reduce((sum, s) => sum + s.reps, 0);
   const repsDiff = currentTotalReps - previousTotalReps;
 
   return {

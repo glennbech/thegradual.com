@@ -19,6 +19,7 @@ export default function SessionPlanner({ onStartSession, onEditTemplate }) {
   const [showAllTemplates, setShowAllTemplates] = useState(false) // Show only 3 templates initially
   const [showWorkoutPreview, setShowWorkoutPreview] = useState(false)
   const [previewTemplate, setPreviewTemplate] = useState(null)
+  const [templateToDelete, setTemplateToDelete] = useState(null) // For delete confirmation
 
   // Use Zustand store data directly (no local state needed)
   const customTemplates = customTemplatesFromStore
@@ -34,8 +35,17 @@ export default function SessionPlanner({ onStartSession, onEditTemplate }) {
     setExercises(data)
   }
 
-  const handleDeleteTemplate = async (templateId, e) => {
+  const handleDeleteTemplate = (template, e) => {
     e.stopPropagation()
+    // Show confirmation dialog
+    setTemplateToDelete(template)
+  }
+
+  const confirmDeleteTemplate = async () => {
+    if (!templateToDelete) return
+
+    const templateId = templateToDelete.id
+    setTemplateToDelete(null) // Close modal
 
     // Delete using Zustand (automatically persists to API)
     try {
@@ -246,7 +256,7 @@ export default function SessionPlanner({ onStartSession, onEditTemplate }) {
                                   <motion.button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleDeleteTemplate(template.id, e);
+                                      handleDeleteTemplate(template, e);
                                     }}
                                     whileTap={{ scale: 0.9 }}
                                     className="p-1.5 bg-white/80 hover:bg-white text-mono-600 hover:text-red-600 transition-colors"
@@ -471,6 +481,68 @@ export default function SessionPlanner({ onStartSession, onEditTemplate }) {
                 >
                   <Play className="w-5 h-5" fill="white" />
                   START WORKOUT
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Template Confirmation Modal */}
+      <AnimatePresence>
+        {templateToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+            onClick={() => setTemplateToDelete(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white border-2 border-mono-900 max-w-md w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-red-600 text-white p-4 flex items-center justify-between">
+                <h3 className="text-lg font-bold uppercase tracking-wide">
+                  Delete Workout?
+                </h3>
+                <button
+                  onClick={() => setTemplateToDelete(null)}
+                  className="hover:opacity-70 transition-opacity"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <p className="text-mono-900 font-semibold mb-2">
+                  {templateToDelete.name}
+                </p>
+                <p className="text-mono-700">
+                  This action cannot be undone.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="p-4 border-t border-mono-200 flex gap-3">
+                <motion.button
+                  onClick={() => setTemplateToDelete(null)}
+                  className="flex-1 h-12 bg-mono-200 text-mono-900 font-bold uppercase tracking-wide text-sm hover:bg-mono-300 transition-colors"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  CANCEL
+                </motion.button>
+                <motion.button
+                  onClick={confirmDeleteTemplate}
+                  className="flex-1 h-12 bg-red-600 text-white font-bold uppercase tracking-wide text-sm hover:opacity-90 transition-opacity"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  DELETE
                 </motion.button>
               </div>
             </motion.div>

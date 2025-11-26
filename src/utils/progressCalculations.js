@@ -4,6 +4,32 @@
  */
 
 /**
+ * Check if a session has any completed sets
+ * @param {Object} session - Session object
+ * @returns {boolean} True if session has at least one completed set
+ */
+export function sessionHasCompletedSets(session) {
+  if (!session || !session.exercises || !Array.isArray(session.exercises)) {
+    return false;
+  }
+
+  return session.exercises.some(exercise => {
+    if (!exercise.sets || !Array.isArray(exercise.sets)) return false;
+    return exercise.sets.some(set => set.completed === true);
+  });
+}
+
+/**
+ * Filter sessions to only include those with at least one completed set
+ * @param {Array} sessions - Array of session objects
+ * @returns {Array} Filtered array of sessions with completed sets
+ */
+export function filterSessionsWithCompletedSets(sessions) {
+  if (!sessions || !Array.isArray(sessions)) return [];
+  return sessions.filter(sessionHasCompletedSets);
+}
+
+/**
  * Get all exercises that have been performed in at least one session
  * @param {Array} sessions - Array of session objects
  * @returns {Array} Array of unique exercise IDs
@@ -41,16 +67,18 @@ export function getExerciseStats(exerciseId, sessions) {
 
     if (exerciseInSession && exerciseInSession.sets && exerciseInSession.sets.length > 0) {
       // Calculate max weight for this session
-      const sessionMaxWeight = Math.max(
-        ...exerciseInSession.sets
-          .filter(set => set.setType !== 'warm-up') // Exclude warm-up sets
-          .map(set => set.weight || 0)
-      );
+      const completedSets = exerciseInSession.sets
+        .filter(set => set.setType !== 'warm-up' && set.completed);
+      const sessionMaxWeight = completedSets.length > 0
+        ? Math.max(...completedSets.map(set => set.weight || 0))
+        : 0;
 
       // Calculate volume for this session
-      const sessionVolume = exerciseInSession.sets.reduce((total, set) => {
-        return total + (set.reps * set.weight);
-      }, 0);
+      const sessionVolume = exerciseInSession.sets
+        .filter(set => set.completed)
+        .reduce((total, set) => {
+          return total + (set.reps * set.weight);
+        }, 0);
 
       exerciseSessions.push({
         sessionId: session.id,
@@ -149,11 +177,11 @@ export function getPersonalRecords(sessions, exercises) {
     session.exercises.forEach(exercise => {
       if (!exercise.sets || exercise.sets.length === 0) return;
 
-      const maxWeight = Math.max(
-        ...exercise.sets
-          .filter(set => set.setType !== 'warm-up')
-          .map(set => set.weight || 0)
-      );
+      const completedSets = exercise.sets
+        .filter(set => set.setType !== 'warm-up' && set.completed);
+      const maxWeight = completedSets.length > 0
+        ? Math.max(...completedSets.map(set => set.weight || 0))
+        : 0;
 
       const existing = exerciseMaxWeights.get(exercise.id);
 
@@ -199,6 +227,9 @@ export function getVolumeMilestones(sessions) {
       if (!exercise.sets || exercise.sets.length === 0) return;
 
       exercise.sets.forEach(set => {
+        // Only count completed sets
+        if (!set.completed) return;
+
         const setVolume = (set.reps || 0) * (set.weight || 0);
         totalVolume += setVolume;
         totalSets++;

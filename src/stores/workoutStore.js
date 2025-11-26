@@ -8,6 +8,7 @@
 
 import { create } from 'zustand';
 import { saveUserState, fetchUserState, ConflictError } from '../services/apiClient';
+import { filterSessionsWithCompletedSets } from '../utils/progressCalculations';
 
 const useWorkoutStore = create((set, get) => ({
       // ==========================================
@@ -305,9 +306,18 @@ const useWorkoutStore = create((set, get) => ({
       },
 
       /**
-       * Get all sessions
+       * Get all sessions (excludes sessions with zero completed sets)
        */
       getSessions: () => {
+        const sessions = get().sessions;
+        // Filter out sessions with no completed sets
+        return filterSessionsWithCompletedSets(sessions);
+      },
+
+      /**
+       * Get all sessions including those with zero completed sets (for internal use)
+       */
+      getAllSessionsIncludingEmpty: () => {
         return get().sessions;
       },
 
@@ -323,7 +333,7 @@ const useWorkoutStore = create((set, get) => ({
        */
       getPreviousSessionForExercise: (exerciseId) => {
         const sessions = get().sessions;
-        const completedSessions = sessions
+        const completedSessions = filterSessionsWithCompletedSets(sessions)
           .filter((s) => s.status === 'completed')
           .sort((a, b) => new Date(b.completedAt || b.endTime) - new Date(a.completedAt || a.endTime));
 

@@ -37,7 +37,7 @@ export default function ExerciseLogger({
   const sessions = useWorkoutStore((state) => state.sessions);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [sets, setSets] = useState([]);
-  const [currentSet, setCurrentSet] = useState({ reps: 10, weight: 20 });
+  const [currentSet, setCurrentSet] = useState({ reps: 10, weight: 20, duration: 30 });
   const [setType, setSetType] = useState('working');
   const [showSetTypeSelector, setShowSetTypeSelector] = useState(false);
   const [showExerciseDescription, setShowExerciseDescription] = useState(false);
@@ -181,19 +181,37 @@ export default function ExerciseLogger({
 
           // Pre-populate sets from previous session as PLANNED (not yet completed)
           const prePopulatedSets = prevExercise?.sets?.map((set) => ({
-            reps: set.reps,
-            weight: set.weight,
+            ...(set.reps !== undefined && { reps: set.reps }),
+            ...(set.weight !== undefined && { weight: set.weight }),
+            ...(set.duration !== undefined && { duration: set.duration }),
             setType: set.setType || 'working',
             completed: false, // IMPORTANT: Mark as planned, not completed!
             plannedFromPrevious: true,
           })) || [];
 
-          // If no previous session data, create default planned sets
-          const defaultPlannedSets = [
-            { reps: 10, weight: 20, completed: false, setType: 'working' },
-            { reps: 10, weight: 20, completed: false, setType: 'working' },
-            { reps: 10, weight: 20, completed: false, setType: 'working' },
-          ];
+          // If no previous session data, create default planned sets based on exercise type
+          const defaultPlannedSets = (() => {
+            if (ex.exerciseType === 'time-based') {
+              return [
+                { duration: 30, completed: false, setType: 'working' },
+                { duration: 30, completed: false, setType: 'working' },
+                { duration: 30, completed: false, setType: 'working' },
+              ];
+            } else if (ex.exerciseType === 'reps-only') {
+              return [
+                { reps: 10, completed: false, setType: 'working' },
+                { reps: 10, completed: false, setType: 'working' },
+                { reps: 10, completed: false, setType: 'working' },
+              ];
+            } else {
+              // weight+reps (default)
+              return [
+                { reps: 10, weight: 20, completed: false, setType: 'working' },
+                { reps: 10, weight: 20, completed: false, setType: 'working' },
+                { reps: 10, weight: 20, completed: false, setType: 'working' },
+              ];
+            }
+          })();
 
           const initialSets = prePopulatedSets.length > 0 ? prePopulatedSets : defaultPlannedSets;
 
@@ -298,13 +316,23 @@ export default function ExerciseLogger({
   const handleAddSet = (setData = null) => {
     if (!currentExercise) return;
 
-    const newSet = setData || {
-      reps: currentSet.reps,
-      weight: currentSet.weight,
-      completedAt: new Date().toISOString(),
-      setType,
-      completed: true, // Manually added sets are immediately completed
-    };
+    const newSet = setData || (() => {
+      // Create set based on exercise type
+      const baseSet = {
+        completedAt: new Date().toISOString(),
+        setType,
+        completed: true, // Manually added sets are immediately completed
+      };
+
+      if (currentExercise.exerciseType === 'time-based') {
+        return { ...baseSet, duration: currentSet.duration };
+      } else if (currentExercise.exerciseType === 'reps-only') {
+        return { ...baseSet, reps: currentSet.reps };
+      } else {
+        // weight+reps (default)
+        return { ...baseSet, reps: currentSet.reps, weight: currentSet.weight };
+      }
+    })();
 
     const updatedExercises = [...activeSession.exercises];
     updatedExercises[currentExerciseIndex].sets = [...sets, newSet];
@@ -636,9 +664,17 @@ export default function ExerciseLogger({
                 key={idx}
                 className="flex-shrink-0 px-3 py-1.5 bg-white border-2 border-mono-900 text-xs"
               >
-                <span className="font-bold text-mono-900">{set.reps}</span>
-                <span className="text-mono-500 mx-1">×</span>
-                <span className="font-bold text-mono-900">{set.weight}kg</span>
+                {currentExercise.exerciseType === 'time-based' ? (
+                  <span className="font-bold text-mono-900">{set.duration || 30}s</span>
+                ) : currentExercise.exerciseType === 'reps-only' ? (
+                  <span className="font-bold text-mono-900">{set.reps} reps</span>
+                ) : (
+                  <>
+                    <span className="font-bold text-mono-900">{set.reps}</span>
+                    <span className="text-mono-500 mx-1">×</span>
+                    <span className="font-bold text-mono-900">{set.weight}kg</span>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -675,57 +711,93 @@ export default function ExerciseLogger({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
-                          Reps
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={editingSetData.reps}
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            if (val >= 0 && val <= 100) {
-                              setEditingSetData({ ...editingSetData, reps: val });
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSaveEditSet();
-                            } else if (e.key === 'Escape') {
-                              handleCancelEditSet();
-                            }
-                          }}
-                          className="w-full h-12 px-3 border-2 border-mono-900 bg-white text-mono-900 text-lg font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
-                          Weight (kg)
-                        </label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={editingSetData.weight}
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            if (val >= 0 && val <= 500) {
-                              setEditingSetData({ ...editingSetData, weight: val });
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSaveEditSet();
-                            } else if (e.key === 'Escape') {
-                              handleCancelEditSet();
-                            }
-                          }}
-                          className="w-full h-12 px-3 border-2 border-mono-900 bg-white text-mono-900 text-lg font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
-                        />
-                      </div>
+                    <div className={`grid ${currentExercise.exerciseType === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+                      {currentExercise.exerciseType === 'time-based' ? (
+                        // Time-based: Show only duration
+                        <div>
+                          <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
+                            Duration (seconds)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={editingSetData.duration || 30}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              if (val >= 0 && val <= 3600) {
+                                setEditingSetData({ ...editingSetData, duration: val });
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveEditSet();
+                              } else if (e.key === 'Escape') {
+                                handleCancelEditSet();
+                              }
+                            }}
+                            className="w-full h-12 px-3 border-2 border-mono-900 bg-white text-mono-900 text-lg font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          {/* Reps input - shown for both reps-only and weight+reps */}
+                          <div>
+                            <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
+                              Reps
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={editingSetData.reps}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                if (val >= 0 && val <= 100) {
+                                  setEditingSetData({ ...editingSetData, reps: val });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveEditSet();
+                                } else if (e.key === 'Escape') {
+                                  handleCancelEditSet();
+                                }
+                              }}
+                              className="w-full h-12 px-3 border-2 border-mono-900 bg-white text-mono-900 text-lg font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
+                            />
+                          </div>
+
+                          {/* Weight input - only shown for weight+reps */}
+                          {currentExercise.exerciseType === 'weight+reps' && (
+                            <div>
+                              <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
+                                Weight (kg)
+                              </label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={editingSetData.weight}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  if (val >= 0 && val <= 500) {
+                                    setEditingSetData({ ...editingSetData, weight: val });
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleSaveEditSet();
+                                  } else if (e.key === 'Escape') {
+                                    handleCancelEditSet();
+                                  }
+                                }}
+                                className="w-full h-12 px-3 border-2 border-mono-900 bg-white text-mono-900 text-lg font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
@@ -776,16 +848,27 @@ export default function ExerciseLogger({
                       }}
                     >
                       <p className={`text-lg font-black mb-0.5 ${set.completed ? 'text-mono-900' : 'text-mono-600'}`}>
-                        {set.reps} reps × {set.weight}kg
+                        {currentExercise.exerciseType === 'time-based' ? (
+                          // Time-based: Show duration only
+                          `${set.duration || 30}s`
+                        ) : currentExercise.exerciseType === 'reps-only' ? (
+                          // Reps-only: Show reps only
+                          `${set.reps} reps`
+                        ) : (
+                          // Weight+reps: Show reps × weight (default)
+                          `${set.reps} reps × ${set.weight}kg`
+                        )}
                         {!set.completed && (
                           <span className="text-xs text-mono-400 ml-2">(tap to edit)</span>
                         )}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-mono-500">
-                        <span className="font-semibold">{(set.reps * set.weight).toFixed(1)}kg</span>
+                        {currentExercise.exerciseType === 'weight+reps' && (
+                          <span className="font-semibold">{(set.reps * set.weight).toFixed(1)}kg</span>
+                        )}
                         {set.setType !== 'working' && (
                           <>
-                            <span>•</span>
+                            {currentExercise.exerciseType === 'weight+reps' && <span>•</span>}
                             <span className="uppercase">{set.setType}</span>
                           </>
                         )}
@@ -848,41 +931,67 @@ export default function ExerciseLogger({
                 </motion.button>
               </div>
 
-              {/* Reps & Weight Inputs */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className={headingStyles.label}>Reps</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={currentSet.reps}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      if (val >= 0 && val <= 100) {
-                        setCurrentSet({ ...currentSet, reps: val });
-                      }
-                    }}
-                    className="h-14 px-4 border-2 border-mono-900 bg-white text-mono-900 text-xl font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
-                  />
-                </div>
+              {/* Input fields - conditional based on exercise type */}
+              <div className={`grid ${currentExercise.exerciseType === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+                {currentExercise.exerciseType === 'time-based' ? (
+                  // Time-based: Show only duration
+                  <div className="flex flex-col gap-2">
+                    <label className={headingStyles.label}>Duration (seconds)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={currentSet.duration}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        if (val >= 0 && val <= 3600) {
+                          setCurrentSet({ ...currentSet, duration: val });
+                        }
+                      }}
+                      className="h-14 px-4 border-2 border-mono-900 bg-white text-mono-900 text-xl font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {/* Reps input - shown for both reps-only and weight+reps */}
+                    <div className="flex flex-col gap-2">
+                      <label className={headingStyles.label}>Reps</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={currentSet.reps}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          if (val >= 0 && val <= 100) {
+                            setCurrentSet({ ...currentSet, reps: val });
+                          }
+                        }}
+                        className="h-14 px-4 border-2 border-mono-900 bg-white text-mono-900 text-xl font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
+                      />
+                    </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className={headingStyles.label}>Weight (kg)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={currentSet.weight}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      if (val >= 0 && val <= 500) {
-                        setCurrentSet({ ...currentSet, weight: val });
-                      }
-                    }}
-                    className="h-14 px-4 border-2 border-mono-900 bg-white text-mono-900 text-xl font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
-                  />
-                </div>
+                    {/* Weight input - only shown for weight+reps */}
+                    {currentExercise.exerciseType === 'weight+reps' && (
+                      <div className="flex flex-col gap-2">
+                        <label className={headingStyles.label}>Weight (kg)</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={currentSet.weight}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            if (val >= 0 && val <= 500) {
+                              setCurrentSet({ ...currentSet, weight: val });
+                            }
+                          }}
+                          className="h-14 px-4 border-2 border-mono-900 bg-white text-mono-900 text-xl font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Note: User now clicks checkbox to complete set */}
