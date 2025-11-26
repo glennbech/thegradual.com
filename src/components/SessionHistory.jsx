@@ -21,6 +21,7 @@ import { headingStyles, iconSizes } from '../utils/typography';
 import SessionTimeline from './SessionTimeline';
 import { getMuscleColor } from '../utils/design-system';
 import BubbleCalendar from './BubbleCalendar';
+import SessionDetailSheet from './SessionDetailSheet';
 
 export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, onClearExpandedSession }) {
   // Zustand store
@@ -29,7 +30,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
   const updateSession = useWorkoutStore((state) => state.updateSession);
   const addCustomTemplate = useWorkoutStore((state) => state.addCustomTemplate);
 
-  const [expandedSession, setExpandedSession] = useState(null);
+  const [selectedSession, setSelectedSession] = useState(null); // For bottom sheet
   const [deletingSession, setDeletingSession] = useState(null);
   const [sessionToDelete, setSessionToDelete] = useState(null); // For confirmation
   const [editingName, setEditingName] = useState(null);
@@ -45,11 +46,14 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     frequency: '',
   });
 
-  // Auto-expand the just-completed session
+  // Auto-open the just-completed session in bottom sheet
   useEffect(() => {
     if (initialExpandedSessionId && sessions.length > 0) {
-      setExpandedSession(initialExpandedSessionId);
-      // Clear the flag after expanding
+      const session = sessions.find(s => s.id === initialExpandedSessionId);
+      if (session) {
+        setSelectedSession(session);
+      }
+      // Clear the flag after opening
       if (onClearExpandedSession) {
         onClearExpandedSession();
       }
@@ -57,7 +61,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
   }, [initialExpandedSessionId, sessions.length, onClearExpandedSession]);
 
   const handleDeleteSession = (sessionId, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     // Find the session to show in confirmation
     const session = sessions.find(s => s.id === sessionId);
     setSessionToDelete(session);
@@ -74,8 +78,8 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
       // AWAIT for API persistence before clearing UI state
       await deleteSession(sessionId);
       setDeletingSession(null);
-      if (expandedSession === sessionId) {
-        setExpandedSession(null);
+      if (selectedSession?.id === sessionId) {
+        setSelectedSession(null);
       }
     }, 300);
   };
@@ -218,8 +222,13 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     return { totalSets, totalReps, totalWeight };
   };
 
-  const toggleExpand = (sessionId) => {
-    setExpandedSession(expandedSession === sessionId ? null : sessionId);
+  const handleOpenSession = (session) => {
+    setSelectedSession(session);
+  };
+
+  const handleCloseSheet = () => {
+    setSelectedSession(null);
+    setEditingSet(null); // Clear any editing state when closing
   };
 
   const visibleSessions = sessions.slice(0, visibleCount);
@@ -286,7 +295,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
         >
           {visibleSessions.map((session) => {
           const stats = calculateStats(session);
-          const isExpanded = expandedSession === session.id;
 
           // Get muscle groups from exercises
           const muscleGroups = [...new Set(session.exercises.map(ex => ex.category))].filter(Boolean);
@@ -305,10 +313,11 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                     }
                   : {}
               }
-              className="bg-white border-2 border-mono-900 overflow-hidden hover:border-mono-700 transition-colors relative"
+              className="bg-white border-2 border-mono-900 overflow-hidden hover:border-mono-700 transition-colors relative cursor-pointer"
+              onClick={() => handleOpenSession(session)}
             >
               {/* Black Header Bar */}
-              <div className="bg-mono-900 px-4 py-3 cursor-pointer" onClick={() => toggleExpand(session.id)}>
+              <div className="bg-mono-900 px-4 py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     {session.templateReference ? (
@@ -324,22 +333,11 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                       </h4>
                     )}
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Expansion indicator */}
-                    <motion.div
-                      animate={{ rotate: isExpanded ? 180 : 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="text-white/60"
-                    >
-                      <ChevronDown className="w-5 h-5" strokeWidth={2} />
-                    </motion.div>
-                  </div>
                 </div>
               </div>
 
               {/* Card Body */}
-              <div className="p-6 cursor-pointer" onClick={() => toggleExpand(session.id)}>
+              <div className="p-6">
                 {/* Date/Time (if using template) */}
                 {session.templateReference && (
                   <p className="text-sm text-mono-600 mb-4">
@@ -433,234 +431,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                   <Trash2 className="w-3.5 h-3.5" />
                 </motion.button>
               </div>
-
-              {/* Expanded Details */}
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="border-t-2 border-mono-900 bg-mono-50"
-                  >
-                    <div className="p-4 space-y-4">
-                      {/* Session Timeline Visualization */}
-                      <SessionTimeline session={session} />
-
-                      {/* Exercise Details */}
-                      <div className="space-y-6">
-                        {session.exercises.map((exercise, index) => {
-                          const exerciseStats = exercise.sets
-                            ? {
-                                totalSets: exercise.sets.length,
-                                totalReps: exercise.sets.reduce((sum, set) => sum + set.reps, 0),
-                                totalWeight: exercise.sets.reduce(
-                                  (sum, set) => sum + set.weight * set.reps,
-                                  0
-                                ),
-                                maxWeight: Math.max(...exercise.sets.map((s) => s.weight)),
-                              }
-                            : null;
-
-                          return (
-                            <motion.div
-                              key={index}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                              className="bg-white border-2 border-mono-300 overflow-hidden shadow-md"
-                            >
-                              <div
-                                className="h-2"
-                                style={{ backgroundColor: getMuscleColor(exercise.muscleGroup) }}
-                              />
-                              <div className="p-4">
-                                <div className="flex items-center gap-3 mb-3">
-                                  <div
-                                    className="p-2"
-                                    style={{
-                                      backgroundColor: getMuscleColor(exercise.muscleGroup),
-                                    }}
-                                  >
-                                    <Dumbbell className="w-4 h-4 text-white" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className={headingStyles.h4}>
-                                      {exercise.name}
-                                    </h4>
-                                    <p className={headingStyles.label}>
-                                      {exercise.category}
-                                    </p>
-                                  </div>
-                                  {exerciseStats && (
-                                    <div className="text-right">
-                                      <p className={headingStyles.label}>
-                                        Max Weight
-                                      </p>
-                                      <p className="text-lg font-bold text-mono-900 tabular-nums">
-                                        {exerciseStats.maxWeight}kg
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {exerciseStats && (
-                                  <div className="grid grid-cols-3 gap-2 mb-3">
-                                    <div className="bg-mono-50 border border-mono-200 p-2 text-center">
-                                      <p className={headingStyles.label}>
-                                        Sets
-                                      </p>
-                                      <p className="text-base font-bold text-mono-900 tabular-nums">
-                                        {exerciseStats.totalSets}
-                                      </p>
-                                    </div>
-                                    <div className="bg-mono-50 border border-mono-200 p-2 text-center">
-                                      <p className={headingStyles.label}>
-                                        Reps
-                                      </p>
-                                      <p className="text-base font-bold text-mono-900 tabular-nums">
-                                        {exerciseStats.totalReps}
-                                      </p>
-                                    </div>
-                                    <div className="bg-mono-50 border border-mono-200 p-2 text-center">
-                                      <p className={headingStyles.label}>
-                                        Volume
-                                      </p>
-                                      <p className="text-base font-bold text-mono-900 tabular-nums">
-                                        {exerciseStats.totalWeight.toFixed(0)}kg
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {exercise.sets && exercise.sets.length > 0 && (
-                                  <div className="space-y-2">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <BarChart3 className="w-4 h-4 text-mono-500" />
-                                      <span className="text-xs font-semibold text-mono-500 uppercase tracking-wide">
-                                        Set Details
-                                      </span>
-                                      <span className="text-xs text-mono-400 uppercase ml-auto">
-                                        Tap to edit
-                                      </span>
-                                    </div>
-                                    {exercise.sets.map((set, setIndex) => {
-                                      const isEditingThisSet = editingSet?.sessionId === session.id &&
-                                        editingSet?.exerciseIndex === index &&
-                                        editingSet?.setIndex === setIndex;
-
-                                      return (
-                                        <motion.div
-                                          key={setIndex}
-                                          initial={{ opacity: 0, scale: 0.9 }}
-                                          animate={{ opacity: 1, scale: 1 }}
-                                          transition={{ delay: setIndex * 0.05 }}
-                                          className={`flex items-center justify-between p-3 ${
-                                            isEditingThisSet
-                                              ? 'bg-yellow-50 border-2 border-yellow-400'
-                                              : 'bg-mono-50 border border-mono-200 cursor-pointer hover:border-mono-400'
-                                          }`}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!isEditingThisSet) {
-                                              handleStartEditSet(session.id, index, setIndex, set, e);
-                                            }
-                                          }}
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <div className="bg-mono-900 text-white w-6 h-6 flex items-center justify-center text-xs font-bold shrink-0">
-                                              {setIndex + 1}
-                                            </div>
-
-                                            {isEditingThisSet ? (
-                                              <div className="flex items-center gap-2">
-                                                <input
-                                                  type="number"
-                                                  inputMode="numeric"
-                                                  value={editingSet.reps}
-                                                  onChange={(e) => handleSetFieldChange('reps', e.target.value, e)}
-                                                  onKeyDown={(e) => handleKeyDown(e, session.id)}
-                                                  onFocus={(e) => e.target.select()}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  className="w-16 px-2 py-1 border-2 border-mono-900 text-sm font-semibold text-center focus:outline-none focus:border-yellow-500"
-                                                  placeholder="Reps"
-                                                  min="0"
-                                                  max="100"
-                                                />
-                                                <span className="text-xs text-mono-500">reps</span>
-                                              </div>
-                                            ) : (
-                                              <span className="text-sm font-semibold text-mono-900">
-                                                {set.reps} reps
-                                              </span>
-                                            )}
-                                          </div>
-
-                                          <div className="flex items-center gap-2">
-                                            {isEditingThisSet ? (
-                                              <>
-                                                <span className="text-sm text-mono-500">×</span>
-                                                <input
-                                                  type="number"
-                                                  inputMode="decimal"
-                                                  value={editingSet.weight}
-                                                  onChange={(e) => handleSetFieldChange('weight', e.target.value, e)}
-                                                  onKeyDown={(e) => handleKeyDown(e, session.id)}
-                                                  onFocus={(e) => e.target.select()}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  className="w-20 px-2 py-1 border-2 border-mono-900 text-lg font-bold text-center focus:outline-none focus:border-yellow-500 tabular-nums"
-                                                  placeholder="kg"
-                                                  min="0"
-                                                  max="500"
-                                                  step="0.5"
-                                                />
-                                                <span className="text-sm text-mono-500">kg</span>
-                                                <div className="flex gap-1 ml-2">
-                                                  <motion.button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleSaveEditSet(session.id);
-                                                    }}
-                                                    whileTap={{ scale: 0.9 }}
-                                                    className="p-1 bg-green-600 text-white hover:bg-green-700 transition-colors"
-                                                    title="Save"
-                                                  >
-                                                    <Check className="w-4 h-4" />
-                                                  </motion.button>
-                                                  <motion.button
-                                                    onClick={handleCancelEditSet}
-                                                    whileTap={{ scale: 0.9 }}
-                                                    className="p-1 bg-mono-400 text-white hover:bg-mono-500 transition-colors"
-                                                    title="Cancel"
-                                                  >
-                                                    <X className="w-4 h-4" />
-                                                  </motion.button>
-                                                </div>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <span className="text-sm text-mono-500">×</span>
-                                                <span className="text-lg font-bold text-mono-900 tabular-nums">
-                                                  {set.weight}kg
-                                                </span>
-                                              </>
-                                            )}
-                                          </div>
-                                        </motion.div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
           );
         })}
@@ -832,6 +602,22 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
           </>
         )}
       </AnimatePresence>
+
+      {/* Session Detail Bottom Sheet */}
+      <SessionDetailSheet
+        session={selectedSession}
+        isOpen={selectedSession !== null}
+        onClose={handleCloseSheet}
+        onDoItAgain={onDoItAgain}
+        onDelete={handleDeleteSession}
+        onSaveAsTemplate={handleMakeTemplate}
+        editingSet={editingSet}
+        onStartEditSet={handleStartEditSet}
+        onSaveEditSet={handleSaveEditSet}
+        onCancelEditSet={handleCancelEditSet}
+        onSetFieldChange={handleSetFieldChange}
+        onKeyDown={handleKeyDown}
+      />
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>

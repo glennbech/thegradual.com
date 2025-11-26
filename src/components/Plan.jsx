@@ -260,7 +260,7 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete }) {
                 transition={{ duration: 0.3 }}
                 className="border-t border-mono-700 overflow-hidden"
               >
-                <div className="container mx-auto px-4 py-4 max-h-64 overflow-y-auto">
+                <div className="container mx-auto px-4 pt-4 pb-8 max-h-64 overflow-y-auto">
                   <div className="space-y-2">
                     {selectedExercises.map((ex, index) => (
                       <motion.div
