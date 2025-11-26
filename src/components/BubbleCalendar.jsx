@@ -117,6 +117,10 @@ export default function BubbleCalendar({ sessions }) {
 
   // Calculate stats and max volume for relative sizing
   const stats = useMemo(() => {
+    if (monthlyData.length === 0) {
+      return { totalVolume: 0, daysWithWorkouts: 0, maxVolume: 0, currentStreak: 0 };
+    }
+
     const allDays = monthlyData.flatMap(m => m.days);
     const totalVolume = allDays.reduce((sum, day) => sum + day.volume, 0);
     const daysWithWorkouts = allDays.filter(d => d.volume > 0).length;

@@ -52,13 +52,13 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
       const session = sessions.find(s => s.id === initialExpandedSessionId);
       if (session) {
         setSelectedSession(session);
-      }
-      // Clear the flag after opening
-      if (onClearExpandedSession) {
-        onClearExpandedSession();
+        // Clear the flag after opening - call once only
+        if (onClearExpandedSession) {
+          onClearExpandedSession();
+        }
       }
     }
-  }, [initialExpandedSessionId, sessions.length, onClearExpandedSession]);
+  }, [initialExpandedSessionId, sessions.length]); // Removed onClearExpandedSession from deps to prevent infinite loop
 
   const handleDeleteSession = (sessionId, e) => {
     if (e) e.stopPropagation();
