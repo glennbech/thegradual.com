@@ -8,22 +8,31 @@ export default function AddExerciseModal({ isOpen, onClose, onAdd }) {
     name: '',
     category: '',
     muscleGroup: 'chest',
+    exerciseType: 'weight+reps',
   })
 
   const categories = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio']
   const muscleGroups = [
-    { value: 'chest', label: 'Chest', color: 'hot-pink' },
-    { value: 'back', label: 'Back', color: 'cyan' },
-    { value: 'legs', label: 'Legs', color: 'purple' },
-    { value: 'shoulders', label: 'Shoulders', color: 'orange' },
-    { value: 'arms', label: 'Arms', color: 'pink' },
+    { value: 'chest', label: 'Chest', color: '#EC4899' },
+    { value: 'back', label: 'Back', color: '#06B6D4' },
+    { value: 'legs', label: 'Legs', color: '#A855F7' },
+    { value: 'shoulders', label: 'Shoulders', color: '#F97316' },
+    { value: 'arms', label: 'Arms', color: '#6366F1' },
+    { value: 'core', label: 'Core', color: '#10B981' },
+    { value: 'cardio', label: 'Cardio', color: '#EAB308' },
+  ]
+
+  const exerciseTypes = [
+    { value: 'weight+reps', label: 'Weight + Reps', description: 'Barbell, dumbbells, machines' },
+    { value: 'reps-only', label: 'Reps Only', description: 'Bodyweight exercises' },
+    { value: 'time-based', label: 'Time Based', description: 'Planks, cardio, holds' },
   ]
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (formData.name && formData.category) {
       onAdd(formData)
-      setFormData({ name: '', category: '', muscleGroup: 'chest' })
+      setFormData({ name: '', category: '', muscleGroup: 'chest', exerciseType: 'weight+reps' })
       onClose()
     }
   }
@@ -121,7 +130,39 @@ export default function AddExerciseModal({ isOpen, onClose, onAdd }) {
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <span className="font-semibold text-gray-900">{group.label}</span>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: group.color }}
+                        />
+                        <span className="font-semibold text-gray-900">{group.label}</span>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Exercise Type */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Exercise Type
+                </label>
+                <div className="space-y-3">
+                  {exerciseTypes.map((type) => (
+                    <motion.button
+                      key={type.value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, exerciseType: type.value })}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                        formData.exerciseType === type.value
+                          ? 'border-flame-500 bg-flame-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-900 mb-1">{type.label}</div>
+                      <div className="text-xs text-gray-500">{type.description}</div>
                     </motion.button>
                   ))}
                 </div>

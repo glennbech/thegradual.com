@@ -38,6 +38,7 @@ export const colors = {
     shoulders: '#F97316',    // orange-500
     arms: '#6366F1',         // indigo-500
     core: '#10B981',         // emerald-500
+    cardio: '#EAB308',       // yellow-500
   },
 
   // Status Colors
@@ -183,6 +184,7 @@ export const getMuscleColor = (muscleGroup) => {
     shoulders: colors.muscle.shoulders,
     arms: colors.muscle.arms,
     core: colors.muscle.core,
+    cardio: colors.muscle.cardio,
   };
 
   return muscleMap[muscleGroup?.toLowerCase()] || colors.border.default;
@@ -199,6 +201,7 @@ export const getMuscleCode = (muscleGroup) => {
     shoulders: 'SHD',
     arms: 'ARM',
     core: 'COR',
+    cardio: 'CRD',
   };
 
   return codeMap[muscleGroup?.toLowerCase()] || 'GEN';

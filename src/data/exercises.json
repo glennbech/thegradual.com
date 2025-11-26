@@ -734,8 +734,8 @@
   {
     "id": "core-8",
     "name": "Mountain Climbers",
-    "category": "Core",
-    "muscleGroup": "core",
+    "category": "Cardio",
+    "muscleGroup": "cardio",
     "exerciseType": "time-based",
     "description": "Plank position, alternate driving knees to chest rapidly, working core and cardio.",
     "primaryMuscles": ["Rectus Abdominis", "Hip Flexors"],
