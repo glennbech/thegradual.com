@@ -8,6 +8,7 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [muscleGroup, setMuscleGroup] = useState('chest')
+  const [exerciseType, setExerciseType] = useState('weight+reps')
 
   const muscleGroups = [
     { value: 'chest', label: 'Chest' },
@@ -16,6 +17,13 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
     { value: 'shoulders', label: 'Shoulders' },
     { value: 'arms', label: 'Arms' },
     { value: 'core', label: 'Core' },
+    { value: 'cardio', label: 'Cardio' },
+  ]
+
+  const exerciseTypes = [
+    { value: 'weight+reps', label: 'Weight + Reps', description: 'Track weight and reps (e.g., Bench Press)' },
+    { value: 'reps-only', label: 'Reps Only', description: 'Track reps only (e.g., Push-ups)' },
+    { value: 'time-based', label: 'Time Based', description: 'Track duration (e.g., Plank)' },
   ]
 
   const handleCreate = async () => {
@@ -30,12 +38,14 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
         name: searchTerm.trim(),
         category,
         muscleGroup,
+        exerciseType,
         isCustom: true,
       }
       await onCreateExercise(newExercise)
       // Reset state
       setIsExpanded(false)
       setMuscleGroup('chest')
+      setExerciseType('weight+reps')
     } catch (error) {
       console.error('Failed to create exercise:', error)
       alert('Failed to create exercise. Please try again.')
@@ -141,6 +151,37 @@ export default function CreateExerciseCard({ searchTerm, onCreateExercise }) {
                         }}
                       >
                         {group.label}
+                      </motion.button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Exercise Type Selection */}
+              <div>
+                <label className={`block ${headingStyles.label} mb-3`}>
+                  Tracking Type *
+                </label>
+                <div className="space-y-2">
+                  {exerciseTypes.map((type) => {
+                    const isSelected = exerciseType === type.value
+                    return (
+                      <motion.button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setExerciseType(type.value)}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        className={`w-full p-3 border-2 transition-all text-left ${
+                          isSelected
+                            ? 'bg-mono-900 text-white border-mono-900'
+                            : 'bg-white text-mono-700 border-mono-200 hover:border-mono-400'
+                        }`}
+                      >
+                        <p className="font-bold text-sm uppercase tracking-wide">{type.label}</p>
+                        <p className={`text-xs mt-1 ${isSelected ? 'text-mono-300' : 'text-mono-500'}`}>
+                          {type.description}
+                        </p>
                       </motion.button>
                     )
                   })}

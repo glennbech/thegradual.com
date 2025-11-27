@@ -117,9 +117,9 @@ export default function SessionDetailSheet({
                 </motion.button>
 
                 <motion.button
-                  onClick={() => {
-                    onSaveAsTemplate(session);
-                    // Don't close - let the modal handle it
+                  onClick={(e) => {
+                    onSaveAsTemplate(session, e);
+                    onClose(); // Close bottom sheet first so modal is visible
                   }}
                   whileTap={{ scale: 0.98 }}
                   className="flex-1 bg-white border-2 border-mono-900 text-mono-900 px-4 py-3 font-bold uppercase tracking-wide text-sm flex items-center justify-center gap-2 hover:bg-mono-50 transition-colors"

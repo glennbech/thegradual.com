@@ -7,7 +7,9 @@ import { formatWeight, formatVolume } from '../utils/progressCalculations';
 export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClose }) {
   if (!isOpen) return null;
 
-  // Prepare chart data from sessions
+  const exerciseType = stats.exerciseType || 'weight+reps';
+
+  // Prepare chart data from sessions - adapt to exercise type
   const chartData = stats.allSessions.map(session => ({
     date: new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     fullDate: new Date(session.date).toLocaleDateString('en-US', {
@@ -15,25 +17,45 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
       day: 'numeric',
       year: 'numeric'
     }),
+    // Weight+reps metrics
     maxWeight: session.maxWeight,
     volume: session.volume,
+    // Reps-only metrics
+    totalReps: session.totalReps,
+    maxReps: session.maxReps,
+    // Time-based metrics
+    maxDuration: session.maxDuration,
+    totalDuration: session.totalDuration,
     sets: session.sets
   }));
 
   const muscleColor = getMuscleColor(exercise.muscleGroup || exercise.category?.toLowerCase() || 'core');
 
-  // Custom tooltip for charts
+  // Custom tooltip for charts - adapt to exercise type
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
         <div className="bg-white p-4 border-2 border-mono-900 shadow-lg">
           <p className="font-bold text-mono-900 mb-2">{data.fullDate}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm font-semibold text-mono-900">
-              {entry.name}: {entry.value.toFixed(1)} {entry.dataKey === 'maxWeight' ? 'kg' : 'kg'}
-            </p>
-          ))}
+          {payload.map((entry, index) => {
+            let unit = '';
+            let value = entry.value;
+
+            if (exerciseType === 'time-based') {
+              unit = 's';
+            } else if (exerciseType === 'reps-only') {
+              unit = ' reps';
+            } else {
+              unit = entry.dataKey === 'maxWeight' ? ' kg' : ' kg';
+            }
+
+            return (
+              <p key={index} className="text-sm font-semibold text-mono-900">
+                {entry.name}: {value.toFixed(exerciseType === 'time-based' ? 0 : 1)}{unit}
+              </p>
+            );
+          })}
           <p className="text-xs text-mono-500 mt-1">{data.sets} sets</p>
         </div>
       );
@@ -107,29 +129,47 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
 
             {/* Content */}
             <div className="max-w-4xl mx-auto p-4 space-y-6 pb-24">
-              {/* Summary Stats */}
+              {/* Summary Stats - Adaptive */}
               <div className="grid grid-cols-3 gap-3">
+                {/* Primary Metric */}
                 <div className="bg-white border-2 border-mono-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="w-4 h-4" style={{ color: muscleColor }} strokeWidth={2} />
-                    <span className="text-xs text-mono-500 uppercase tracking-wide">Max Weight</span>
+                    <span className="text-xs text-mono-500 uppercase tracking-wide">
+                      {exerciseType === 'time-based' ? 'Best Time' :
+                       exerciseType === 'reps-only' ? 'Max Reps' :
+                       'Max Weight'}
+                    </span>
                   </div>
                   <p className="text-2xl font-bold text-mono-900 tabular-nums">
-                    {formatWeight(stats.maxWeight)}
-                    <span className="text-sm font-normal ml-1">kg</span>
+                    {exerciseType === 'time-based' ?
+                      `${stats.maxDuration}s` :
+                     exerciseType === 'reps-only' ?
+                      stats.maxReps :
+                      `${formatWeight(stats.maxWeight)} kg`}
                   </p>
                 </div>
 
+                {/* Secondary Metric */}
                 <div className="bg-white border-2 border-mono-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <BarChart3 className="w-4 h-4" style={{ color: muscleColor }} strokeWidth={2} />
-                    <span className="text-xs text-mono-500 uppercase tracking-wide">Total Volume</span>
+                    <span className="text-xs text-mono-500 uppercase tracking-wide">
+                      {exerciseType === 'time-based' ? 'Total Time' :
+                       exerciseType === 'reps-only' ? 'Total Reps' :
+                       'Total Volume'}
+                    </span>
                   </div>
                   <p className="text-2xl font-bold text-mono-900 tabular-nums">
-                    {formatVolume(stats.totalVolume)}
+                    {exerciseType === 'time-based' ?
+                      `${Math.floor(stats.totalDuration / 60)}m ${stats.totalDuration % 60}s` :
+                     exerciseType === 'reps-only' ?
+                      stats.totalReps :
+                      formatVolume(stats.totalVolume)}
                   </p>
                 </div>
 
+                {/* Sessions */}
                 <div className="bg-white border-2 border-mono-900 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Dumbbell className="w-4 h-4" style={{ color: muscleColor }} strokeWidth={2} />
@@ -141,7 +181,7 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                 </div>
               </div>
 
-              {/* Max Weight Chart */}
+              {/* Primary Metric Chart */}
               {chartData.length > 1 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -150,10 +190,14 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                 >
                   <div className="p-4 border-b-2 border-mono-900">
                     <h3 className="text-lg font-bold text-mono-900 uppercase tracking-tight">
-                      Max Weight Progression
+                      {exerciseType === 'time-based' ? 'Max Duration Progression' :
+                       exerciseType === 'reps-only' ? 'Max Reps Progression' :
+                       'Max Weight Progression'}
                     </h3>
                     <p className="text-xs text-mono-500 uppercase mt-1">
-                      Heaviest weight lifted per session
+                      {exerciseType === 'time-based' ? 'Longest duration per session' :
+                       exerciseType === 'reps-only' ? 'Most reps in a single set per session' :
+                       'Heaviest weight lifted per session'}
                     </p>
                   </div>
                   <div className="p-6">
@@ -168,16 +212,27 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                         <YAxis
                           stroke="#6b7280"
                           style={{ fontSize: '12px', fontWeight: 600 }}
-                          label={{ value: 'Weight (kg)', angle: -90, position: 'insideLeft', style: { fontSize: '12px', fontWeight: 600 } }}
+                          label={{
+                            value: exerciseType === 'time-based' ? 'Duration (s)' :
+                                   exerciseType === 'reps-only' ? 'Reps' :
+                                   'Weight (kg)',
+                            angle: -90,
+                            position: 'insideLeft',
+                            style: { fontSize: '12px', fontWeight: 600 }
+                          }}
                         />
                         <Tooltip content={<CustomTooltip />} />
                         <Legend wrapperStyle={{ fontSize: '14px', fontWeight: 600 }} />
                         <Line
                           type="monotone"
-                          dataKey="maxWeight"
+                          dataKey={exerciseType === 'time-based' ? 'maxDuration' :
+                                   exerciseType === 'reps-only' ? 'maxReps' :
+                                   'maxWeight'}
                           stroke={muscleColor}
                           strokeWidth={3}
-                          name="Max Weight (kg)"
+                          name={exerciseType === 'time-based' ? 'Max Duration (s)' :
+                                exerciseType === 'reps-only' ? 'Max Reps' :
+                                'Max Weight (kg)'}
                           dot={{ fill: muscleColor, r: 5, strokeWidth: 2, stroke: '#fff' }}
                           activeDot={{ r: 7 }}
                         />
@@ -187,7 +242,7 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                 </motion.div>
               )}
 
-              {/* Volume Chart */}
+              {/* Secondary Metric Chart */}
               {chartData.length > 1 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -197,10 +252,14 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                 >
                   <div className="p-4 border-b-2 border-mono-900">
                     <h3 className="text-lg font-bold text-mono-900 uppercase tracking-tight">
-                      Volume Progression
+                      {exerciseType === 'time-based' ? 'Total Duration Progression' :
+                       exerciseType === 'reps-only' ? 'Total Reps Progression' :
+                       'Volume Progression'}
                     </h3>
                     <p className="text-xs text-mono-500 uppercase mt-1">
-                      Total volume (sets × reps × weight) per session
+                      {exerciseType === 'time-based' ? 'Total time across all sets per session' :
+                       exerciseType === 'reps-only' ? 'Total reps across all sets per session' :
+                       'Total volume (sets × reps × weight) per session'}
                     </p>
                   </div>
                   <div className="p-6">
@@ -215,16 +274,27 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                         <YAxis
                           stroke="#6b7280"
                           style={{ fontSize: '12px', fontWeight: 600 }}
-                          label={{ value: 'Volume (kg)', angle: -90, position: 'insideLeft', style: { fontSize: '12px', fontWeight: 600 } }}
+                          label={{
+                            value: exerciseType === 'time-based' ? 'Duration (s)' :
+                                   exerciseType === 'reps-only' ? 'Total Reps' :
+                                   'Volume (kg)',
+                            angle: -90,
+                            position: 'insideLeft',
+                            style: { fontSize: '12px', fontWeight: 600 }
+                          }}
                         />
                         <Tooltip content={<CustomTooltip />} />
                         <Legend wrapperStyle={{ fontSize: '14px', fontWeight: 600 }} />
                         <Line
                           type="monotone"
-                          dataKey="volume"
+                          dataKey={exerciseType === 'time-based' ? 'totalDuration' :
+                                   exerciseType === 'reps-only' ? 'totalReps' :
+                                   'volume'}
                           stroke={muscleColor}
                           strokeWidth={3}
-                          name="Volume (kg)"
+                          name={exerciseType === 'time-based' ? 'Total Duration (s)' :
+                                exerciseType === 'reps-only' ? 'Total Reps' :
+                                'Volume (kg)'}
                           dot={{ fill: muscleColor, r: 5, strokeWidth: 2, stroke: '#fff' }}
                           activeDot={{ r: 7 }}
                         />
@@ -234,7 +304,7 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                 </motion.div>
               )}
 
-              {/* Session History Table */}
+              {/* Session History Table - Adaptive */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -260,10 +330,14 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                           Sets
                         </th>
                         <th className="text-right py-3 px-4 text-xs font-bold text-mono-900 uppercase tracking-wide">
-                          Max Weight
+                          {exerciseType === 'time-based' ? 'Max Time' :
+                           exerciseType === 'reps-only' ? 'Max Reps' :
+                           'Max Weight'}
                         </th>
                         <th className="text-right py-3 px-4 text-xs font-bold text-mono-900 uppercase tracking-wide">
-                          Volume
+                          {exerciseType === 'time-based' ? 'Total Time' :
+                           exerciseType === 'reps-only' ? 'Total Reps' :
+                           'Volume'}
                         </th>
                       </tr>
                     </thead>
@@ -284,10 +358,18 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                             {session.sets}
                           </td>
                           <td className="py-3 px-4 text-sm text-right font-bold text-mono-900 tabular-nums">
-                            {formatWeight(session.maxWeight)} kg
+                            {exerciseType === 'time-based' ?
+                              `${session.maxDuration}s` :
+                             exerciseType === 'reps-only' ?
+                              session.maxReps :
+                              `${formatWeight(session.maxWeight)} kg`}
                           </td>
                           <td className="py-3 px-4 text-sm text-right font-bold text-mono-900 tabular-nums">
-                            {formatVolume(session.volume)}
+                            {exerciseType === 'time-based' ?
+                              `${Math.floor(session.totalDuration / 60)}m ${session.totalDuration % 60}s` :
+                             exerciseType === 'reps-only' ?
+                              session.totalReps :
+                              formatVolume(session.volume)}
                           </td>
                         </tr>
                       ))}

@@ -77,7 +77,7 @@ export default function ExerciseProgressCard({ exercise, stats, trend, onClick }
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Adaptive based on exercise type */}
       <div className="grid grid-cols-3 gap-2">
         {/* Session Count */}
         <div className="bg-mono-50 border border-mono-200 p-2">
@@ -89,14 +89,19 @@ export default function ExerciseProgressCard({ exercise, stats, trend, onClick }
           </p>
         </div>
 
-        {/* Max Weight */}
+        {/* Primary Metric - varies by exercise type */}
         <div className="bg-mono-50 border border-mono-200 p-2">
           <p className="text-xs text-mono-500 uppercase tracking-wide mb-1">
-            Max Weight
+            {stats.exerciseType === 'time-based' ? 'Best Time' :
+             stats.exerciseType === 'reps-only' ? 'Max Reps' :
+             'Max Weight'}
           </p>
           <p className="text-lg font-bold text-mono-900 tabular-nums">
-            {formatWeight(stats.maxWeight)}
-            <span className="text-xs font-normal ml-0.5">kg</span>
+            {stats.exerciseType === 'time-based' ?
+              `${stats.maxDuration}s` :
+             stats.exerciseType === 'reps-only' ?
+              stats.maxReps :
+              `${formatWeight(stats.maxWeight)} kg`}
           </p>
         </div>
 
@@ -114,15 +119,20 @@ export default function ExerciseProgressCard({ exercise, stats, trend, onClick }
         </div>
       </div>
 
-      {/* Total Volume (smaller stat below) */}
+      {/* Secondary Metric - varies by exercise type */}
       <div className="mt-3 pt-3 border-t border-mono-200">
         <div className="flex items-center justify-between">
           <p className="text-xs text-mono-500 uppercase tracking-wide">
-            Total Volume
+            {stats.exerciseType === 'time-based' ? 'Total Time' :
+             stats.exerciseType === 'reps-only' ? 'Total Reps' :
+             'Total Volume'}
           </p>
           <p className="text-sm font-bold text-mono-900 tabular-nums">
-            {(stats.totalVolume / 1000).toFixed(1)}
-            <span className="text-xs font-normal ml-0.5">tons</span>
+            {stats.exerciseType === 'time-based' ?
+              `${Math.floor(stats.totalDuration / 60)}m ${stats.totalDuration % 60}s` :
+             stats.exerciseType === 'reps-only' ?
+              stats.totalReps :
+              `${(stats.totalVolume / 1000).toFixed(1)} tons`}
           </p>
         </div>
       </div>

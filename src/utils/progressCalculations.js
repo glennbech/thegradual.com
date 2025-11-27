@@ -52,12 +52,18 @@ export function getPerformedExercises(sessions) {
  * Get comprehensive statistics for a specific exercise
  * @param {string} exerciseId - Exercise ID to analyze
  * @param {Array} sessions - Array of all sessions
- * @returns {Object} Statistics object with sessionCount, maxWeight, totalVolume, allSessions
+ * @param {Object} exerciseDefinition - Optional exercise definition with exerciseType
+ * @returns {Object} Statistics object adapted to exercise type
  */
-export function getExerciseStats(exerciseId, sessions) {
+export function getExerciseStats(exerciseId, sessions, exerciseDefinition = null) {
   const exerciseSessions = [];
   let maxWeight = 0;
   let totalVolume = 0;
+  let maxReps = 0;
+  let totalReps = 0;
+  let maxDuration = 0;
+  let totalDuration = 0;
+  let exerciseType = null;
 
   // Filter sessions and calculate stats
   sessions.forEach(session => {
@@ -66,35 +72,72 @@ export function getExerciseStats(exerciseId, sessions) {
     const exerciseInSession = session.exercises.find(ex => ex.id === exerciseId);
 
     if (exerciseInSession && exerciseInSession.sets && exerciseInSession.sets.length > 0) {
-      // Calculate max weight for this session
+      // Determine exercise type from definition first, then session data
+      if (!exerciseType) {
+        if (exerciseDefinition && exerciseDefinition.exerciseType) {
+          exerciseType = exerciseDefinition.exerciseType;
+        } else if (exerciseInSession.exerciseType) {
+          exerciseType = exerciseInSession.exerciseType;
+        } else {
+          // Infer from sets as last resort
+          const firstSet = exerciseInSession.sets[0];
+          if (firstSet.duration !== undefined) {
+            exerciseType = 'time-based';
+          } else if (firstSet.weight !== undefined && firstSet.weight > 0) {
+            exerciseType = 'weight+reps';
+          } else {
+            exerciseType = 'reps-only';
+          }
+        }
+      }
+
       const completedSets = exerciseInSession.sets
         .filter(set => set.setType !== 'warm-up' && set.completed);
-      const sessionMaxWeight = completedSets.length > 0
-        ? Math.max(...completedSets.map(set => set.weight || 0))
-        : 0;
 
-      // Calculate volume for this session
-      const sessionVolume = exerciseInSession.sets
-        .filter(set => set.completed)
-        .reduce((total, set) => {
-          return total + (set.reps * set.weight);
-        }, 0);
+      let sessionMaxWeight = 0;
+      let sessionVolume = 0;
+      let sessionTotalReps = 0;
+      let sessionMaxReps = 0;
+      let sessionMaxDuration = 0;
+      let sessionTotalDuration = 0;
+
+      completedSets.forEach(set => {
+        if (exerciseType === 'time-based') {
+          const duration = set.duration || 0;
+          sessionTotalDuration += duration;
+          if (duration > sessionMaxDuration) sessionMaxDuration = duration;
+        } else if (exerciseType === 'reps-only') {
+          const reps = set.reps || 0;
+          sessionTotalReps += reps;
+          if (reps > sessionMaxReps) sessionMaxReps = reps;
+        } else { // weight+reps
+          const weight = set.weight || 0;
+          const reps = set.reps || 0;
+          sessionVolume += reps * weight;
+          if (weight > sessionMaxWeight) sessionMaxWeight = weight;
+        }
+      });
 
       exerciseSessions.push({
         sessionId: session.id,
         date: session.completedAt || session.createdAt,
         maxWeight: sessionMaxWeight,
         volume: sessionVolume,
+        totalReps: sessionTotalReps,
+        maxReps: sessionMaxReps,
+        maxDuration: sessionMaxDuration,
+        totalDuration: sessionTotalDuration,
         sets: exerciseInSession.sets.length,
         exercise: exerciseInSession
       });
 
-      // Update overall max weight
-      if (sessionMaxWeight > maxWeight) {
-        maxWeight = sessionMaxWeight;
-      }
-
+      // Update overall stats
+      if (sessionMaxWeight > maxWeight) maxWeight = sessionMaxWeight;
+      if (sessionMaxReps > maxReps) maxReps = sessionMaxReps;
+      if (sessionMaxDuration > maxDuration) maxDuration = sessionMaxDuration;
       totalVolume += sessionVolume;
+      totalReps += sessionTotalReps;
+      totalDuration += sessionTotalDuration;
     }
   });
 
@@ -103,14 +146,23 @@ export function getExerciseStats(exerciseId, sessions) {
 
   return {
     sessionCount: exerciseSessions.length,
+    exerciseType: exerciseType || 'weight+reps',
+    // Weight+Reps metrics
     maxWeight,
     totalVolume,
+    // Reps-only metrics
+    maxReps,
+    totalReps,
+    // Time-based metrics
+    maxDuration,
+    totalDuration,
     allSessions: exerciseSessions
   };
 }
 
 /**
  * Calculate trend for an exercise (comparing recent vs previous performance)
+ * Adapts metric based on exercise type
  * @param {string} exerciseId - Exercise ID to analyze
  * @param {Array} sessions - Array of all sessions
  * @param {number} recentCount - Number of recent sessions to compare (default: 3)
@@ -131,16 +183,31 @@ export function calculateTrend(exerciseId, sessions, recentCount = 3) {
 
   // Get recent sessions (last N)
   const recentSessions = stats.allSessions.slice(-recentCount);
-  const recentAvgWeight = recentSessions.reduce((sum, s) => sum + s.maxWeight, 0) / recentCount;
 
   // Get baseline sessions (N sessions before recent)
   const baselineSessions = stats.allSessions.slice(-(recentCount * 2), -recentCount);
-  const baselineAvgWeight = baselineSessions.reduce((sum, s) => sum + s.maxWeight, 0) / recentCount;
+
+  let recentAvg, baselineAvg;
+
+  // Choose metric based on exercise type
+  if (stats.exerciseType === 'time-based') {
+    // For time-based: higher duration = better (e.g., planks)
+    recentAvg = recentSessions.reduce((sum, s) => sum + s.maxDuration, 0) / recentCount;
+    baselineAvg = baselineSessions.reduce((sum, s) => sum + s.maxDuration, 0) / recentCount;
+  } else if (stats.exerciseType === 'reps-only') {
+    // For reps-only: higher total reps per session = better
+    recentAvg = recentSessions.reduce((sum, s) => sum + s.totalReps, 0) / recentCount;
+    baselineAvg = baselineSessions.reduce((sum, s) => sum + s.totalReps, 0) / recentCount;
+  } else {
+    // For weight+reps: higher max weight = better
+    recentAvg = recentSessions.reduce((sum, s) => sum + s.maxWeight, 0) / recentCount;
+    baselineAvg = baselineSessions.reduce((sum, s) => sum + s.maxWeight, 0) / recentCount;
+  }
 
   // Calculate percentage change
-  const percentageChange = baselineAvgWeight === 0
+  const percentageChange = baselineAvg === 0
     ? 0
-    : ((recentAvgWeight - baselineAvgWeight) / baselineAvgWeight) * 100;
+    : ((recentAvg - baselineAvg) / baselineAvg) * 100;
 
   // Determine direction
   let direction = 'neutral';
@@ -156,8 +223,8 @@ export function calculateTrend(exerciseId, sessions, recentCount = 3) {
     percentage: Math.abs(percentageChange),
     direction,
     status: 'success',
-    recentAvg: recentAvgWeight,
-    baselineAvg: baselineAvgWeight
+    recentAvg,
+    baselineAvg
   };
 }
 

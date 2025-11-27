@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar,
@@ -22,13 +22,24 @@ import SessionTimeline from './SessionTimeline';
 import { getMuscleColor } from '../utils/design-system';
 import BubbleCalendar from './BubbleCalendar';
 import SessionDetailSheet from './SessionDetailSheet';
+import { filterSessionsWithCompletedSets } from '../utils/progressCalculations';
 
 export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, onClearExpandedSession }) {
-  // Zustand store
-  const sessions = useWorkoutStore((state) => state.getSessions());
+  // Zustand store - get raw sessions
+  const rawSessions = useWorkoutStore((state) => state.sessions);
   const deleteSession = useWorkoutStore((state) => state.deleteSession);
   const updateSession = useWorkoutStore((state) => state.updateSession);
   const addCustomTemplate = useWorkoutStore((state) => state.addCustomTemplate);
+
+  // Memoize filtered and sorted sessions (newest first) to prevent reference changes
+  const sessions = useMemo(() => {
+    const filtered = filterSessionsWithCompletedSets(rawSessions);
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.completedAt || a.createdAt).getTime();
+      const dateB = new Date(b.completedAt || b.createdAt).getTime();
+      return dateB - dateA; // Descending order (newest first)
+    });
+  }, [rawSessions]);
 
   const [selectedSession, setSelectedSession] = useState(null); // For bottom sheet
   const [deletingSession, setDeletingSession] = useState(null);
@@ -38,27 +49,28 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
   const [makingTemplate, setMakingTemplate] = useState(null);
   const [visibleCount, setVisibleCount] = useState(5);
   const [editingSet, setEditingSet] = useState(null); // { sessionId, exerciseIndex, setIndex, reps, weight }
+  const processedSessionIdRef = useRef(null);
   const [templateForm, setTemplateForm] = useState({
     name: '',
     description: '',
     difficulty: 'intermediate',
     duration: '',
-    frequency: '',
   });
 
   // Auto-open the just-completed session in bottom sheet
   useEffect(() => {
-    if (initialExpandedSessionId && sessions.length > 0) {
+    if (initialExpandedSessionId && initialExpandedSessionId !== processedSessionIdRef.current) {
       const session = sessions.find(s => s.id === initialExpandedSessionId);
       if (session) {
         setSelectedSession(session);
-        // Clear the flag after opening - call once only
+        processedSessionIdRef.current = initialExpandedSessionId;
+        // Clear the flag immediately to prevent re-triggering
         if (onClearExpandedSession) {
           onClearExpandedSession();
         }
       }
     }
-  }, [initialExpandedSessionId, sessions.length]); // Removed onClearExpandedSession from deps to prevent infinite loop
+  }, [initialExpandedSessionId, onClearExpandedSession, sessions]);
 
   const handleDeleteSession = (sessionId, e) => {
     if (e) e.stopPropagation();
@@ -97,14 +109,18 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
   };
 
   const handleMakeTemplate = (session, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     setMakingTemplate(session);
+    const sessionDate = new Date(session.completedAt || session.createdAt).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
     setTemplateForm({
-      name: session.name || 'My Workout',
+      name: session.templateReference?.templateName || `Workout from ${sessionDate}`,
       description: `Custom template with ${session.exercises.length} exercises`,
       difficulty: 'intermediate',
       duration: '60-75 min',
-      frequency: '2-3x per week',
     });
   };
 
@@ -119,7 +135,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
       description: templateForm.description,
       difficulty: templateForm.difficulty,
       duration: templateForm.duration,
-      frequency: templateForm.frequency,
       exerciseIds,
     });
 
@@ -129,7 +144,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
       description: '',
       difficulty: 'intermediate',
       duration: '',
-      frequency: '',
     });
   };
 
@@ -477,7 +491,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className={headingStyles.h2}>
-                      Create Workout
+                      Create Workout Template
                     </h2>
                     <motion.button
                       type="button"
@@ -554,22 +568,6 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                         required
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-mono-700 mb-2 uppercase tracking-widest">
-                      Frequency
-                    </label>
-                    <input
-                      type="text"
-                      value={templateForm.frequency}
-                      onChange={(e) =>
-                        setTemplateForm({ ...templateForm, frequency: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border-2 border-mono-900 focus:outline-none transition-colors"
-                      placeholder="2-3x per week"
-                      required
-                    />
                   </div>
 
                   <div className="bg-mono-50 border-2 border-mono-200 p-4">

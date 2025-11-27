@@ -89,7 +89,7 @@ export default function Analyze() {
 
   const handleExerciseClick = (exercise) => {
     const completedSessions = sessions.filter(s => s.status === 'completed');
-    const stats = getExerciseStats(exercise.id, completedSessions);
+    const stats = getExerciseStats(exercise.id, completedSessions, exercise);
     setSelectedExercise(exercise);
     setSelectedStats(stats);
   };
@@ -372,7 +372,7 @@ export default function Analyze() {
           >
             {performedExercises.map((exercise) => {
               const completedSessions = sessions.filter(s => s.status === 'completed');
-              const stats = getExerciseStats(exercise.id, completedSessions);
+              const stats = getExerciseStats(exercise.id, completedSessions, exercise);
               const trend = calculateTrend(exercise.id, completedSessions);
 
               return (

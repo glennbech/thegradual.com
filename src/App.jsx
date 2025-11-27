@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy, Activity, Pencil } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
@@ -32,7 +32,14 @@ function AppContent() {
   const loadFromAPI = useWorkoutStore((state) => state.loadFromAPI)
   const clearActiveSession = useWorkoutStore((state) => state.clearActiveSession)
   const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession)
-  const [currentView, setCurrentView] = useState('home')
+  // Parse initial view from URL pathname
+  const getInitialView = () => {
+    const path = window.location.pathname.replace(/^\//, '') || 'home'
+    const validViews = ['home', 'plan', 'history', 'analyze', 'profile', 'logger']
+    return validViews.includes(path) ? path : 'home'
+  }
+
+  const [currentView, setCurrentView] = useState(getInitialView())
   const [selectedExercises, setSelectedExercises] = useState([])
   const [templateReference, setTemplateReference] = useState(null)
   const [showDebugModal, setShowDebugModal] = useState(false)
@@ -41,6 +48,11 @@ function AppContent() {
   const [transferUserId, setTransferUserId] = useState(null) // Transfer from another device
   const [templateToEdit, setTemplateToEdit] = useState(null) // Template being edited in Plan page
   const userId = getUserId() // Get or create user UUID
+
+  // Memoize the clear function to prevent infinite loops
+  const handleClearExpandedSession = useCallback(() => {
+    setCompletedSessionId(null)
+  }, [])
 
   // Load data from DynamoDB when user is authenticated
   useEffect(() => {
@@ -67,18 +79,16 @@ function AppContent() {
 
   // Initialize history state
   useEffect(() => {
-    // Set initial state
-    window.history.replaceState({ view: 'home' }, '', window.location.pathname)
+    // Set initial state based on current view
+    const initialPath = currentView === 'home' ? '/' : `/${currentView}`
+    window.history.replaceState({ view: currentView }, '', initialPath)
 
     // Handle browser back/forward buttons
     const handlePopState = (event) => {
-      if (event.state && event.state.view) {
-        setCurrentView(event.state.view)
-      } else {
-        // If no state, push to home
-        setCurrentView('home')
-        window.history.pushState({ view: 'home' }, '', window.location.pathname)
-      }
+      const path = window.location.pathname.replace(/^\//, '') || 'home'
+      const validViews = ['home', 'plan', 'history', 'analyze', 'profile', 'logger']
+      const view = validViews.includes(path) ? path : 'home'
+      setCurrentView(view)
     }
 
     window.addEventListener('popstate', handlePopState)
@@ -92,7 +102,7 @@ function AppContent() {
     setSelectedExercises(exercises)
     setTemplateReference(templateRef) // NEW: Store template reference
     setCurrentView('logger')
-    window.history.pushState({ view: 'logger' }, '', window.location.pathname)
+    window.history.pushState({ view: 'logger' }, '', '/logger')
   }
 
   const handleSessionCreated = (session) => {
@@ -113,24 +123,24 @@ function AppContent() {
 
     // Navigate to history (activeSession is already cleared by Zustand store)
     setCurrentView('history')
-    window.history.pushState({ view: 'history' }, '', window.location.pathname)
+    window.history.pushState({ view: 'history' }, '', '/history')
   }
 
   const handleDoItAgain = (exercises) => {
     setSelectedExercises(exercises)
     setCurrentView('logger')
-    window.history.pushState({ view: 'logger' }, '', window.location.pathname)
+    window.history.pushState({ view: 'logger' }, '', '/logger')
   }
 
   const handleNavigateToLogger = () => {
     setCurrentView('logger')
-    window.history.pushState({ view: 'logger' }, '', window.location.pathname)
+    window.history.pushState({ view: 'logger' }, '', '/logger')
   }
 
   const handleEditTemplate = (template) => {
     setTemplateToEdit(template)
     setCurrentView('plan')
-    window.history.pushState({ view: 'plan' }, '', window.location.pathname)
+    window.history.pushState({ view: 'plan' }, '', '/plan')
   }
 
   const handleDiscardSession = async () => {
@@ -147,7 +157,7 @@ function AppContent() {
 
       console.log('[App] Active session cleared, navigating to home');
       setCurrentView('home');
-      window.history.pushState({ view: 'home' }, '', window.location.pathname);
+      window.history.pushState({ view: 'home' }, '', '/');
       console.log('[App] Navigation complete, view set to home');
     } catch (error) {
       console.error('[App] handleDiscardSession: Error clearing session:', error);
@@ -206,7 +216,7 @@ function AppContent() {
                   setSelectedExercises([])
                   setTemplateReference(null)
                   setSessionPlannerKey(prev => prev + 1) // Force SessionPlanner to remount
-                  window.history.pushState({ view: 'home' }, '', window.location.pathname)
+                  window.history.pushState({ view: 'home' }, '', '/')
                 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -304,7 +314,7 @@ function AppContent() {
                 <SessionHistory
                   onDoItAgain={handleDoItAgain}
                   initialExpandedSessionId={completedSessionId}
-                  onClearExpandedSession={() => setCompletedSessionId(null)}
+                  onClearExpandedSession={handleClearExpandedSession}
                 />
               )}
 
@@ -337,7 +347,8 @@ function AppContent() {
                   key={item.id}
                   onClick={() => {
                     setCurrentView(item.id)
-                    window.history.pushState({ view: item.id }, '', window.location.pathname)
+                    const path = item.id === 'home' ? '/' : `/${item.id}`
+                    window.history.pushState({ view: item.id }, '', path)
                   }}
                   whileTap={{ scale: 0.95 }}
                   className={`flex flex-col items-center gap-1 px-6 py-2 transition-all border-b-2 ${
