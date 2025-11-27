@@ -94,6 +94,9 @@ export function getExerciseStats(exerciseId, sessions, exerciseDefinition = null
       const completedSets = exerciseInSession.sets
         .filter(set => set.setType !== 'warm-up' && set.completed);
 
+      // Skip sessions with no completed sets
+      if (completedSets.length === 0) return;
+
       let sessionMaxWeight = 0;
       let sessionVolume = 0;
       let sessionTotalReps = 0;
@@ -127,7 +130,7 @@ export function getExerciseStats(exerciseId, sessions, exerciseDefinition = null
         maxReps: sessionMaxReps,
         maxDuration: sessionMaxDuration,
         totalDuration: sessionTotalDuration,
-        sets: exerciseInSession.sets.length,
+        sets: completedSets.length, // Only count completed sets
         exercise: exerciseInSession
       });
 
