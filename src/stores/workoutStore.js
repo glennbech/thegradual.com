@@ -172,38 +172,34 @@ const useWorkoutStore = create((set, get) => ({
       updateActiveSession: async (updates) => {
         const { activeSession, isOnline } = get();
 
-        if (!isOnline) {
-          throw new Error('Cannot update session while offline');
-        }
-
         if (!activeSession) {
           console.warn('[workoutStore] No active session to update');
           return null;
         }
 
-        set({ isLoading: true });
-
         const updatedSession = { ...activeSession, ...updates };
 
-        try {
-          // Save to API FIRST with version
-          const state = get();
-          await state._saveWithVersion({
-            sessions: state.sessions,
-            customExercises: state.customExercises,
-            customTemplates: state.customTemplates,
-            activeSession: updatedSession,
-          });
+        // OPTIMISTIC UPDATE: Update local state immediately for instant UI feedback
+        set({ activeSession: updatedSession });
 
-          // Only update local state after successful API save
-          set({ activeSession: updatedSession, isLoading: false });
-          console.log('[workoutStore] Active session updated and saved to DynamoDB');
-          return updatedSession;
-        } catch (error) {
-          set({ isLoading: false });
-          console.error('[workoutStore] Failed to save session update:', error);
-          throw error;
+        // Sync to API in background (non-blocking)
+        if (isOnline) {
+          try {
+            const state = get();
+            await state._saveWithVersion({
+              sessions: state.sessions,
+              customExercises: state.customExercises,
+              customTemplates: state.customTemplates,
+              activeSession: updatedSession,
+            });
+            console.log('[workoutStore] Active session synced to DynamoDB');
+          } catch (error) {
+            console.error('[workoutStore] Background sync failed:', error);
+            // Could implement retry logic or rollback here if needed
+          }
         }
+
+        return updatedSession;
       },
 
       /**

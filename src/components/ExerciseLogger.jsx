@@ -35,8 +35,6 @@ export default function ExerciseLogger({
   const clearActiveSession = useWorkoutStore((state) => state.clearActiveSession);
   const getPreviousSessionForExercise = useWorkoutStore((state) => state.getPreviousSessionForExercise);
   const sessions = useWorkoutStore((state) => state.sessions);
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [sets, setSets] = useState([]);
   const [currentSet, setCurrentSet] = useState({ reps: 10, weight: 20, duration: 30 });
   const [setType, setSetType] = useState('working');
   const [showSetTypeSelector, setShowSetTypeSelector] = useState(false);
@@ -45,15 +43,14 @@ export default function ExerciseLogger({
   const [editingSetIndex, setEditingSetIndex] = useState(null);
   const [editingSetData, setEditingSetData] = useState(null);
 
-  // Historical comparison
-  const [previousSessionData, setPreviousSessionData] = useState(null);
-  const [comparison, setComparison] = useState(null);
+  // Editing state - track which exercise's set is being edited
+  const [editingExerciseIndex, setEditingExerciseIndex] = useState(null);
 
   // Session Tracking
   const hasInitialized = useRef(false);
 
-  // Add Set Form - Collapsed by default
-  const [showAddSetForm, setShowAddSetForm] = useState(false);
+  // Add Set Form - Track which exercise has form open (null = none open)
+  const [addSetFormOpenForExercise, setAddSetFormOpenForExercise] = useState(null);
 
   // Exercise info modal
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
@@ -115,7 +112,6 @@ export default function ExerciseLogger({
     frame();
   };
 
-  // Restore currentExerciseIndex from activeSession when it loads
   // Debug logging for component lifecycle
   useEffect(() => {
     console.log('🔵 [ExerciseLogger] Component MOUNTED');
@@ -128,12 +124,6 @@ export default function ExerciseLogger({
   useEffect(() => {
     console.log('🔵 [ExerciseLogger] activeSession changed:', activeSession);
   }, [activeSession]);
-
-  useEffect(() => {
-    if (activeSession?.currentExerciseIndex !== undefined) {
-      setCurrentExerciseIndex(activeSession.currentExerciseIndex);
-    }
-  }, [activeSession?.id]); // Only run when activeSession changes
 
   // Initialize session - runs once on mount
   useEffect(() => {
@@ -162,22 +152,10 @@ export default function ExerciseLogger({
       try {
         console.log('[ExerciseLogger] Initializing new session with', exercises.length, 'exercises');
 
-        // Get previous session data if template is specified
-        let previousSession = null;
-        if (templateReference?.templateId) {
-          // Find most recent session with this template
-          const sortedSessions = sessions
-            .filter(s => s.templateReference?.templateId === templateReference.templateId && s.status === 'completed')
-            .sort((a, b) => new Date(b.completedAt || b.endTime) - new Date(a.completedAt || a.endTime));
-          previousSession = sortedSessions[0];
-        }
-
         // Prepare exercises with pre-populated sets
         const preparedExercises = exercises.map((ex) => {
-          // Find matching exercise in previous session
-          const prevExercise = previousSession?.exercises?.find(
-            (prevEx) => prevEx.id === ex.id
-          );
+          // Find most recent session containing this exercise (across all templates)
+          const prevExercise = getPreviousSessionForExercise(ex.id);
 
           // Pre-populate sets from previous session as PLANNED (not yet completed)
           const prePopulatedSets = prevExercise?.sets?.map((set) => ({
@@ -237,61 +215,29 @@ export default function ExerciseLogger({
     initSession();
   }, [activeSession, exercises, templateReference, startSession, onSessionCreated, sessions]);
 
-  // Load exercise data - SIMPLIFIED: Just sync what's in activeSession
-  useEffect(() => {
-    if (!activeSession || !activeSession.exercises[currentExerciseIndex]) {
-      return;
-    }
-
-    const currentEx = activeSession.exercises[currentExerciseIndex];
-
-    // Simple: Just load whatever sets exist in activeSession
-    setSets(currentEx.sets || []);
-
-    // Load previous session data for display only (doesn't modify current sets)
-    const prevData = getPreviousSessionForExercise(currentEx.id);
-    setPreviousSessionData(prevData);
-  }, [currentExerciseIndex, activeSession]);
-
-  // Update comparison when sets change
-  useEffect(() => {
-    if (previousSessionData && sets.length > 0) {
-      const comp = comparePerformance({ sets }, previousSessionData);
-      setComparison(comp);
-    } else {
-      setComparison(null);
-    }
-  }, [sets, previousSessionData]);
-
-  const currentExercise = activeSession?.exercises[currentExerciseIndex];
-
   // Safe getter for exercise type with fallback to 'weight+reps' for backward compatibility
   const getExerciseType = (exercise) => {
     return exercise?.exerciseType || 'weight+reps';
   };
 
-  const handleToggleSet = (index) => {
-    if (!currentExercise) {
-      return;
-    }
+  const handleToggleSet = (exerciseIndex, setIndex) => {
+    const exercise = activeSession?.exercises[exerciseIndex];
+    if (!exercise) return;
 
-    const updatedSets = [...sets];
-    const set = updatedSets[index];
+    const updatedSets = [...exercise.sets];
+    const set = updatedSets[setIndex];
 
     // Toggle completed status
     const isNowCompleted = !set.completed;
 
-    updatedSets[index] = {
+    updatedSets[setIndex] = {
       ...set,
       completed: isNowCompleted,
       completedAt: isNowCompleted ? new Date().toISOString() : null,
     };
 
     const updatedExercises = [...activeSession.exercises];
-    updatedExercises[currentExerciseIndex].sets = updatedSets;
-
-    // Update local state first
-    setSets(updatedSets);
+    updatedExercises[exerciseIndex].sets = updatedSets;
 
     // Celebrate when completing a set
     if (isNowCompleted) {
@@ -319,18 +265,18 @@ export default function ExerciseLogger({
     updateActiveSession({ exercises: updatedExercises });
   };
 
-  const handleAddSet = (setData = null) => {
-    if (!currentExercise) return;
+  const handleAddSet = (exerciseIndex, setData = null) => {
+    const exercise = activeSession?.exercises[exerciseIndex];
+    if (!exercise) return;
 
     const newSet = setData || (() => {
       // Create set based on exercise type
       const baseSet = {
-        completedAt: new Date().toISOString(),
         setType,
-        completed: true, // Manually added sets are immediately completed
+        completed: false, // Manually added sets start unchecked
       };
 
-      const exerciseType = getExerciseType(currentExercise);
+      const exerciseType = getExerciseType(exercise);
       if (exerciseType === 'time-based') {
         return { ...baseSet, duration: currentSet.duration };
       } else if (exerciseType === 'reps-only') {
@@ -342,80 +288,57 @@ export default function ExerciseLogger({
     })();
 
     const updatedExercises = [...activeSession.exercises];
-    updatedExercises[currentExerciseIndex].sets = [...sets, newSet];
+    updatedExercises[exerciseIndex].sets = [...exercise.sets, newSet];
 
     updateActiveSession({ exercises: updatedExercises });
-
-    setSets([...sets, newSet]);
-
-    // Celebrate the added set!
-    celebrateSet();
 
     // Reset set type to 'working' for next set
     setSetType('working');
   };
 
+  const handleRemoveSet = (exerciseIndex, setIndex) => {
+    const exercise = activeSession?.exercises[exerciseIndex];
+    if (!exercise) return;
 
-  const handleRemoveSet = (index) => {
-    const updatedSets = sets.filter((_, i) => i !== index);
+    const updatedSets = exercise.sets.filter((_, i) => i !== setIndex);
     const updatedExercises = [...activeSession.exercises];
-    updatedExercises[currentExerciseIndex].sets = updatedSets;
+    updatedExercises[exerciseIndex].sets = updatedSets;
 
     updateActiveSession({ exercises: updatedExercises });
-
-    setSets(updatedSets);
   };
 
-  const handleStartEditSet = (index) => {
-    setEditingSetIndex(index);
-    setEditingSetData({ ...sets[index] });
+  const handleStartEditSet = (exerciseIndex, setIndex) => {
+    const exercise = activeSession?.exercises[exerciseIndex];
+    if (!exercise) return;
+
+    setEditingExerciseIndex(exerciseIndex);
+    setEditingSetIndex(setIndex);
+    setEditingSetData({ ...exercise.sets[setIndex] });
   };
 
   const handleCancelEditSet = () => {
+    setEditingExerciseIndex(null);
     setEditingSetIndex(null);
     setEditingSetData(null);
   };
 
   const handleSaveEditSet = () => {
-    if (editingSetIndex === null || !editingSetData) return;
+    if (editingExerciseIndex === null || editingSetIndex === null || !editingSetData) return;
 
-    const updatedSets = [...sets];
+    const exercise = activeSession?.exercises[editingExerciseIndex];
+    if (!exercise) return;
+
+    const updatedSets = [...exercise.sets];
     updatedSets[editingSetIndex] = { ...editingSetData };
 
     const updatedExercises = [...activeSession.exercises];
-    updatedExercises[currentExerciseIndex].sets = updatedSets;
+    updatedExercises[editingExerciseIndex].sets = updatedSets;
 
     updateActiveSession({ exercises: updatedExercises });
 
-    setSets(updatedSets);
+    setEditingExerciseIndex(null);
     setEditingSetIndex(null);
     setEditingSetData(null);
-  };
-
-  const handleNextExercise = () => {
-    if (currentExerciseIndex < activeSession.exercises.length - 1) {
-      const newIndex = currentExerciseIndex + 1;
-      setCurrentExerciseIndex(newIndex);
-      setCurrentSet({ reps: 10, weight: 20 });
-      setShowExerciseDescription(false);
-      setShowSetTypeSelector(false);
-
-      // Save current exercise index to activeSession (timer will auto-reset in ActiveSessionHeader)
-      updateActiveSession({ currentExerciseIndex: newIndex });
-    }
-  };
-
-  const handlePreviousExercise = () => {
-    if (currentExerciseIndex > 0) {
-      const newIndex = currentExerciseIndex - 1;
-      setCurrentExerciseIndex(newIndex);
-      setCurrentSet({ reps: 10, weight: 20 });
-      setShowExerciseDescription(false);
-      setShowSetTypeSelector(false);
-
-      // Save current exercise index to activeSession (timer will auto-reset in ActiveSessionHeader)
-      updateActiveSession({ currentExerciseIndex: newIndex });
-    }
   };
 
   const handleCompleteWorkout = () => {
@@ -506,7 +429,7 @@ export default function ExerciseLogger({
     }
   };
 
-  if (!currentExercise) {
+  if (!activeSession || !activeSession.exercises || activeSession.exercises.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-mono-400">Loading...</p>
@@ -599,104 +522,38 @@ export default function ExerciseLogger({
         )}
       </AnimatePresence>
 
-      {/* Exercise Navigation Header */}
-      <div className="bg-mono-50 px-3 pt-3 pb-3">
-        <div className="bg-white border-2 border-mono-900">
-          <div className="flex items-center gap-3 p-4">
-            <div
-              className="flex-1 cursor-pointer hover:bg-mono-50 -m-2 p-2 rounded transition-colors"
-              onClick={() => setShowExerciseDetail(true)}
-            >
-              <p className={`${headingStyles.label} mb-1 tabular-nums flex items-center gap-2`}>
-                <span>Exercise {currentExerciseIndex + 1} / {activeSession.exercises.length}</span>
-                <Info className="w-3 h-3 text-mono-500" />
-              </p>
-              <h2
-                className={headingStyles.h1}
-                style={{ color: getMuscleColor(currentExercise.category) }}
-              >
-                {currentExercise.name}
-              </h2>
-              <p className={`${headingStyles.label} mt-1`}>
-                {currentExercise.category}
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              {currentExerciseIndex > 0 && (
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handlePreviousExercise}
-                  className="w-10 h-10 bg-white border border-mono-300 text-mono-900 flex items-center justify-center"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </motion.button>
-              )}
-
-              {currentExerciseIndex < activeSession.exercises.length - 1 ? (
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleNextExercise}
-                  className="w-10 h-10 bg-mono-900 text-white flex items-center justify-center"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </motion.button>
-              ) : (
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleCompleteWorkout}
-                  className="px-4 h-10 bg-mono-900 text-white flex items-center justify-center gap-2 font-bold uppercase text-sm"
-                >
-                  <Trophy className="w-4 h-4" />
-                  Finish
-                </motion.button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Scrollable Content Area */}
-      <div className="container mx-auto px-3 space-y-4 pb-32">
-        {/* Previous Session - Clean Banner */}
-        {previousSessionData && previousSessionData.sets && previousSessionData.sets.length > 0 && (
-        <div className="px-4 py-3 bg-mono-50 border-2 border-mono-200">
-          <p className="text-xs font-bold uppercase tracking-widest text-mono-600 mb-2 flex items-center gap-2">
-            <Trophy className="w-3 h-3" />
-            Last Time: {previousSessionData.sets.length} sets
-          </p>
-          <div className="flex gap-2 overflow-x-auto">
-            {previousSessionData.sets.map((set, idx) => (
-              <div
-                key={idx}
-                className="flex-shrink-0 px-3 py-1.5 bg-white border-2 border-mono-900 text-xs"
-              >
-                {getExerciseType(currentExercise) === 'time-based' ? (
-                  <span className="font-bold text-mono-900">{set.duration || 30}s</span>
-                ) : getExerciseType(currentExercise) === 'reps-only' ? (
-                  <span className="font-bold text-mono-900">{set.reps} reps</span>
-                ) : (
-                  <>
-                    <span className="font-bold text-mono-900">{set.reps}</span>
-                    <span className="text-mono-500 mx-1">×</span>
-                    <span className="font-bold text-mono-900">{set.weight}kg</span>
-                  </>
-                )}
+      {/* Scrollable Content Area - Vertical Layout */}
+      <div className="container mx-auto px-3 space-y-6 pb-32">
+        {activeSession.exercises.map((exercise, exerciseIndex) => (
+          <div key={exercise.id} className="space-y-4">
+            {/* Exercise Header */}
+            <div className="bg-white border-2 border-mono-900 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className={`${headingStyles.label} mb-1 flex items-center gap-2`}>
+                    <span className="uppercase">{exercise.category}</span>
+                    <span className="text-mono-400">•</span>
+                    <span>Exercise {exerciseIndex + 1} of {activeSession.exercises.length}</span>
+                  </p>
+                  <h2
+                    className={headingStyles.h2}
+                    style={{ color: getMuscleColor(exercise.category) }}
+                  >
+                    {exercise.name}
+                  </h2>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Sets List */}
-      <div className="space-y-3">
-        <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
-          Sets ({sets.filter(s => s.completed !== false).length}/{sets.length})
-        </h3>
-        <div className="space-y-2">
-          {sets.map((set, index) => (
-              <motion.div
-                key={index}
+            {/* Sets List */}
+            <div className="space-y-3">
+              <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
+                Sets ({exercise.sets.filter(s => s.completed !== false).length}/{exercise.sets.length})
+              </h3>
+              <div className="space-y-2">
+                {exercise.sets.map((set, setIndex) => (
+                  <motion.div
+                    key={setIndex}
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -100 }}
@@ -705,21 +562,21 @@ export default function ExerciseLogger({
                     ? 'border-2 border-mono-900'
                     : 'border border-mono-200'
                 }`}
-              >
-                {editingSetIndex === index && editingSetData ? (
-                  // Edit Mode
-                  <div className="space-y-3 p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-mono-900 text-white flex items-center justify-center font-bold text-sm">
-                        {index + 1}
-                      </div>
-                      <span className="text-sm font-semibold text-mono-600 uppercase tracking-wide">
-                        Editing Set
-                      </span>
-                    </div>
+                  >
+                    {editingExerciseIndex === exerciseIndex && editingSetIndex === setIndex && editingSetData ? (
+                      // Edit Mode
+                      <div className="space-y-3 p-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-mono-900 text-white flex items-center justify-center font-bold text-sm">
+                            {setIndex + 1}
+                          </div>
+                          <span className="text-sm font-semibold text-mono-600 uppercase tracking-wide">
+                            Editing Set
+                          </span>
+                        </div>
 
-                    <div className={`grid ${getExerciseType(currentExercise) === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
-                      {getExerciseType(currentExercise) === 'time-based' ? (
+                        <div className={`grid ${getExerciseType(exercise) === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+                          {getExerciseType(exercise) === 'time-based' ? (
                         // Time-based: Show only duration
                         <div>
                           <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
@@ -776,10 +633,10 @@ export default function ExerciseLogger({
                           </div>
 
                           {/* Weight input - only shown for weight+reps */}
-                          {getExerciseType(currentExercise) === 'weight+reps' && (
+                          {getExerciseType(exercise) === 'weight+reps' && (
                             <div>
                               <label className="block text-xs font-medium text-mono-500 uppercase tracking-wide mb-1">
-                                Weight (kg)
+                                Weight
                               </label>
                               <input
                                 type="text"
@@ -825,99 +682,88 @@ export default function ExerciseLogger({
                     </div>
                   </div>
                 ) : (
-                  // Display Mode - Simple horizontal layout with checkbox on left
-                  <div className="flex items-center gap-4 py-4 px-4">
-                    {/* Checkbox - toggleable */}
-                    <motion.button
-                      onClick={() => handleToggleSet(index)}
-                      whileTap={{ scale: 0.95 }}
-                      className={`w-10 h-10 flex-shrink-0 border-2 flex items-center justify-center transition-colors ${
-                        set.completed
-                          ? 'bg-mono-900 border-mono-900'
-                          : 'bg-white border-mono-900 hover:bg-mono-50'
-                      }`}
-                      type="button"
-                    >
-                      {set.completed ? (
-                        <Check className="w-6 h-6 text-white" strokeWidth={3} />
-                      ) : (
-                        <span className="text-mono-400 text-sm font-bold">{index + 1}</span>
-                      )}
-                    </motion.button>
+                      // Display Mode - Horizontal layout with checkbox on right
+                      <div className="flex items-center gap-4 py-4 px-4">
+                        {/* Set details - clickable when not completed */}
+                        <div
+                          className={`flex-1 ${!set.completed ? 'cursor-pointer hover:bg-mono-50 -m-2 p-2 rounded transition-colors' : ''}`}
+                          onClick={() => {
+                            if (!set.completed) {
+                              handleStartEditSet(exerciseIndex, setIndex);
+                            }
+                          }}
+                        >
+                          <p className={`text-lg font-black mb-0.5 ${set.completed ? 'text-mono-900' : 'text-mono-600'}`}>
+                            {getExerciseType(exercise) === 'time-based' ? (
+                              // Time-based: Show duration only
+                              `${set.duration || 30}s`
+                            ) : getExerciseType(exercise) === 'reps-only' ? (
+                              // Reps-only: Show reps only
+                              `${set.reps} reps`
+                            ) : (
+                              // Weight+reps: Show reps × weight (default)
+                              `${set.reps} reps × ${set.weight}kg`
+                            )}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-mono-500">
+                            {set.setType !== 'working' && (
+                              <span className="uppercase">{set.setType}</span>
+                            )}
+                            {set.completed && set.restDuration && (
+                              <>
+                                <span>•</span>
+                                <span>{set.restDuration}s rest</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
 
-                    {/* Set details - clickable when not completed */}
-                    <div
-                      className={`flex-1 ${!set.completed ? 'cursor-pointer hover:bg-mono-50 -m-2 p-2 rounded transition-colors' : ''}`}
-                      onClick={() => {
-                        if (!set.completed) {
-                          handleStartEditSet(index);
-                        }
-                      }}
-                    >
-                      <p className={`text-lg font-black mb-0.5 ${set.completed ? 'text-mono-900' : 'text-mono-600'}`}>
-                        {getExerciseType(currentExercise) === 'time-based' ? (
-                          // Time-based: Show duration only
-                          `${set.duration || 30}s`
-                        ) : getExerciseType(currentExercise) === 'reps-only' ? (
-                          // Reps-only: Show reps only
-                          `${set.reps} reps`
-                        ) : (
-                          // Weight+reps: Show reps × weight (default)
-                          `${set.reps} reps × ${set.weight}kg`
-                        )}
-                        {!set.completed && (
-                          <span className="text-xs text-mono-400 ml-2">(tap to edit)</span>
-                        )}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-mono-500">
-                        {getExerciseType(currentExercise) === 'weight+reps' && (
-                          <span className="font-semibold">{(set.reps * set.weight).toFixed(1)}kg</span>
-                        )}
-                        {set.setType !== 'working' && (
-                          <>
-                            {getExerciseType(currentExercise) === 'weight+reps' && <span>•</span>}
-                            <span className="uppercase">{set.setType}</span>
-                          </>
-                        )}
-                        {set.completed && set.restDuration && (
-                          <>
-                            <span>•</span>
-                            <span>{set.restDuration}s rest</span>
-                          </>
-                        )}
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <motion.button
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => handleRemoveSet(exerciseIndex, setIndex)}
+                            className="p-2 text-mono-400 hover:text-red-500"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </motion.button>
+                        </div>
+
+                        {/* Checkbox - toggleable (right side for thumb reach) */}
+                        <motion.button
+                          onClick={() => handleToggleSet(exerciseIndex, setIndex)}
+                          whileTap={{ scale: 0.95 }}
+                          className={`w-10 h-10 flex-shrink-0 border-2 flex items-center justify-center transition-colors ${
+                            set.completed
+                              ? 'bg-mono-900 border-mono-900'
+                              : 'bg-white border-mono-900 hover:bg-mono-50'
+                          }`}
+                          type="button"
+                        >
+                          {set.completed && (
+                            <Check className="w-6 h-6 text-white" strokeWidth={3} />
+                          )}
+                        </motion.button>
                       </div>
-                    </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
 
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <motion.button
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleRemoveSet(index)}
-                        className="p-2 text-mono-400 hover:text-red-500"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            ))}
-        </div>
-      </div>
-
-      {/* Add Another Set - Collapsible Form */}
-      <div className="bg-white border-2 border-mono-200">
-        {!showAddSetForm ? (
-          // Collapsed State - Small "+ Add Set" button
-          <motion.button
-            onClick={() => setShowAddSetForm(true)}
-            className="w-full py-4 flex items-center justify-center gap-2 text-mono-600 hover:text-mono-900 hover:bg-mono-50 transition-colors"
-            whileTap={{ scale: 0.98 }}
-          >
-            <span className="text-2xl font-bold">+</span>
-            <span className="font-bold uppercase tracking-wide text-sm">Add Another Set</span>
-          </motion.button>
-        ) : (
+            {/* Add Another Set - Collapsible Form */}
+            <div className="bg-white border-2 border-mono-200">
+              {addSetFormOpenForExercise !== exerciseIndex ? (
+                // Collapsed State - Small "+ Add Set" button
+                <motion.button
+                  onClick={() => setAddSetFormOpenForExercise(exerciseIndex)}
+                  className="w-full py-4 flex items-center justify-center gap-2 text-mono-600 hover:text-mono-900 hover:bg-mono-50 transition-colors"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="text-2xl font-bold">+</span>
+                  <span className="font-bold uppercase tracking-wide text-sm">Add Another Set</span>
+                </motion.button>
+              ) : (
           // Expanded State - Input Form
           <motion.div
             initial={{ height: 0, opacity: 0 }}
@@ -926,21 +772,21 @@ export default function ExerciseLogger({
             className="overflow-hidden"
           >
             <div className="p-6 space-y-4">
-              {/* Header with close button */}
-              <div className="flex items-center justify-between">
-                <h3 className={headingStyles.h3}>Add Extra Set</h3>
-                <motion.button
-                  onClick={() => setShowAddSetForm(false)}
-                  className="text-mono-400 hover:text-mono-900"
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <X className="w-5 h-5" />
-                </motion.button>
-              </div>
+                {/* Header with close button */}
+                <div className="flex items-center justify-between">
+                  <h3 className={headingStyles.h3}>Add Extra Set</h3>
+                  <motion.button
+                    onClick={() => setAddSetFormOpenForExercise(null)}
+                    className="text-mono-400 hover:text-mono-900"
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <X className="w-5 h-5" />
+                  </motion.button>
+                </div>
 
               {/* Input fields - conditional based on exercise type */}
-              <div className={`grid ${getExerciseType(currentExercise) === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-                {getExerciseType(currentExercise) === 'time-based' ? (
+              <div className={`grid ${getExerciseType(exercise) === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+                {getExerciseType(exercise) === 'time-based' ? (
                   // Time-based: Show only duration
                   <div className="flex flex-col gap-2">
                     <label className={headingStyles.label}>Duration (seconds)</label>
@@ -979,9 +825,9 @@ export default function ExerciseLogger({
                     </div>
 
                     {/* Weight input - only shown for weight+reps */}
-                    {getExerciseType(currentExercise) === 'weight+reps' && (
+                    {getExerciseType(exercise) === 'weight+reps' && (
                       <div className="flex flex-col gap-2">
-                        <label className={headingStyles.label}>Weight (kg)</label>
+                        <label className={headingStyles.label}>Weight</label>
                         <input
                           type="text"
                           inputMode="decimal"
@@ -1001,60 +847,42 @@ export default function ExerciseLogger({
                 )}
               </div>
 
-              {/* Note: User now clicks checkbox to complete set */}
-              <p className="text-xs text-mono-500 text-center">
-                Click checkbox on set to mark complete
-              </p>
+                {/* Submit button */}
+                <motion.button
+                  onClick={() => {
+                    handleAddSet(exerciseIndex);
+                    setAddSetFormOpenForExercise(null);
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full h-14 bg-mono-900 text-white font-bold uppercase tracking-wide flex items-center justify-center gap-2"
+                >
+                  <span className="text-2xl font-bold">+</span>
+                  Add Set
+                </motion.button>
+
+                {/* Note: User now clicks checkbox to complete set */}
+                <p className="text-xs text-mono-500 text-center">
+                  Click checkbox on set to mark complete
+                </p>
+              </div>
+            </motion.div>
+          )}
             </div>
-          </motion.div>
-        )}
-      </div>
+          </div>
+        ))}
 
-      {/* Navigation Buttons (Fixed at bottom) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-mono-900 p-4 z-10">
-        <div className="max-w-2xl mx-auto flex gap-3">
-          {currentExerciseIndex > 0 ? (
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={handlePreviousExercise}
-              className="flex-1 h-14 bg-white border-2 border-mono-900 text-mono-900 font-bold uppercase tracking-wide flex items-center justify-center gap-2"
-            >
-              <ChevronLeft className="w-5 h-5" />
-              Previous
-            </motion.button>
-          ) : (
-            <div className="flex-1" />
-          )}
-
-          {currentExerciseIndex < activeSession.exercises.length - 1 ? (
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={handleNextExercise}
-              className="flex-1 h-14 bg-mono-900 text-white font-bold uppercase tracking-wide flex items-center justify-center gap-2"
-            >
-              Next Exercise
-              <ChevronRight className="w-5 h-5" />
-            </motion.button>
-          ) : (
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={handleCompleteWorkout}
-              className="flex-1 h-14 bg-mono-900 text-white font-bold uppercase tracking-wide flex items-center justify-center gap-2"
-            >
-              <Trophy className="w-5 h-5" />
-              Complete Workout
-            </motion.button>
-          )}
+        {/* Complete Workout Button */}
+        <div className="pt-6">
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={handleCompleteWorkout}
+            className="w-full h-16 bg-mono-900 text-white font-bold uppercase tracking-wide flex items-center justify-center gap-3 text-lg"
+          >
+            <Trophy className="w-6 h-6" />
+            Complete Workout
+          </motion.button>
         </div>
       </div>
-      </div>
-
-      {/* Exercise Detail Modal */}
-      <ExerciseDetailModal
-        exercise={currentExercise}
-        isOpen={showExerciseDetail}
-        onClose={() => setShowExerciseDetail(false)}
-      />
     </>
   );
 }

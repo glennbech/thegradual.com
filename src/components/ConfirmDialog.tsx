@@ -1,6 +1,17 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
 
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: 'default' | 'warning' | 'success';
+}
+
 export default function ConfirmDialog({
   isOpen,
   onClose,
@@ -9,8 +20,8 @@ export default function ConfirmDialog({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  variant = 'default' // 'default' | 'warning' | 'success'
-}) {
+  variant = 'default'
+}: ConfirmDialogProps) {
   if (!isOpen) return null;
 
   const variants = {

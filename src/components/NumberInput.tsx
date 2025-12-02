@@ -3,6 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Minus, Plus, X } from 'lucide-react';
 import { colors, sizes, typography } from '../utils/design-system';
 
+interface NumberInputProps {
+  value: number;
+  onChange: (value: number) => void;
+  label?: string;
+  unit?: string;
+  increment?: number;
+  min?: number;
+  max?: number;
+  className?: string;
+}
+
 /**
  * NumberInput - Large touch-friendly number input component
  *
@@ -21,7 +32,7 @@ const NumberInput = ({
   min = 0,
   max = 999,
   className = '',
-}) => {
+}: NumberInputProps) => {
   const [showNumpad, setShowNumpad] = useState(false);
   const [tempValue, setTempValue] = useState(value.toString());
 

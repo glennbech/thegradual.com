@@ -2,6 +2,16 @@ import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Award, Minus } from 'lucide-react';
 import { colors } from '../utils/design-system';
 
+type ComparisonType = 'volume' | 'weight' | 'reps' | 'percent' | 'pr';
+
+interface ComparisonBadgeProps {
+  type?: ComparisonType;
+  diff?: number | null;
+  unit?: string;
+  showIcon?: boolean;
+  className?: string;
+}
+
 /**
  * ComparisonBadge - Shows improvement/decline compared to previous session
  *
@@ -17,7 +27,7 @@ const ComparisonBadge = ({
   unit = 'kg',
   showIcon = true,
   className = '',
-}) => {
+}: ComparisonBadgeProps) => {
   // Don't render if no difference
   if (diff === undefined || diff === null || diff === 0) {
     return null;
@@ -88,6 +98,14 @@ const ComparisonBadge = ({
   );
 };
 
+interface ComparisonRowProps {
+  volumeDiff?: number | null;
+  weightDiff?: number | null;
+  repsDiff?: number | null;
+  isPR?: boolean;
+  className?: string;
+}
+
 /**
  * ComparisonRow - Full row showing multiple comparison metrics
  */
@@ -97,7 +115,7 @@ export const ComparisonRow = ({
   repsDiff,
   isPR = false,
   className = '',
-}) => {
+}: ComparisonRowProps) => {
   const hasComparison = volumeDiff || weightDiff || repsDiff || isPR;
 
   if (!hasComparison) return null;
@@ -123,6 +141,13 @@ export const ComparisonRow = ({
   );
 };
 
+interface ComparisonTextProps {
+  type?: Exclude<ComparisonType, 'pr'>;
+  diff?: number | null;
+  unit?: string;
+  className?: string;
+}
+
 /**
  * ComparisonText - Inline text version without badge styling
  */
@@ -131,7 +156,7 @@ export const ComparisonText = ({
   diff,
   unit = 'kg',
   className = '',
-}) => {
+}: ComparisonTextProps) => {
   if (diff === undefined || diff === null || diff === 0) {
     return null;
   }

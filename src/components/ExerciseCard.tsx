@@ -5,8 +5,16 @@ import { cardHover } from '../utils/animations'
 import { getMuscleColor } from '../utils/design-system'
 import { headingStyles } from '../utils/typography'
 import ExerciseDetailModal from './ExerciseDetailModal'
+import type { Exercise } from '../types/exercise'
 
-export default function ExerciseCard({ exercise, onAdd, onDelete, showDelete = false }) {
+interface ExerciseCardProps {
+  exercise: Exercise;
+  onAdd?: (exercise: Exercise) => void;
+  onDelete?: (exercise: Exercise) => void;
+  showDelete?: boolean;
+}
+
+export default function ExerciseCard({ exercise, onAdd, onDelete, showDelete = false }: ExerciseCardProps) {
   const [showDetail, setShowDetail] = useState(false)
   const muscleGroupConfig = {
     chest: {
