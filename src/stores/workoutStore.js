@@ -91,7 +91,8 @@ const useWorkoutStore = create((set, get) => ({
           templateReference,
           status: 'active',
           currentExerciseIndex: 0,
-          triggerRestTimerTimestamp: null,
+          restStartTime: null,
+          isResting: false,
         };
 
         try {

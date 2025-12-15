@@ -252,10 +252,11 @@ export default function ExerciseLogger({
         }, 300);
       } else {
         // Start rest timer after completing a set (but not the last one)
-        // Trigger rest timer in the ActiveSessionHeader using a timestamp (so it's unique)
+        // Store rest start time in DynamoDB for accurate calculation
         updateActiveSession({
           exercises: updatedExercises,
-          triggerRestTimerTimestamp: Date.now()
+          restStartTime: Date.now(),
+          isResting: true
         });
         return; // Return early since we already updated
       }
@@ -301,10 +302,26 @@ export default function ExerciseLogger({
     if (!exercise) return;
 
     const updatedSets = exercise.sets.filter((_, i) => i !== setIndex);
-    const updatedExercises = [...activeSession.exercises];
-    updatedExercises[exerciseIndex].sets = updatedSets;
 
-    updateActiveSession({ exercises: updatedExercises });
+    // If all sets are removed, remove the entire exercise from the workout
+    if (updatedSets.length === 0) {
+      const updatedExercises = activeSession.exercises.filter((_, i) => i !== exerciseIndex);
+
+      // Adjust currentExerciseIndex if needed
+      const newCurrentIndex = exerciseIndex >= updatedExercises.length
+        ? Math.max(0, updatedExercises.length - 1)
+        : activeSession.currentExerciseIndex;
+
+      updateActiveSession({
+        exercises: updatedExercises,
+        currentExerciseIndex: newCurrentIndex
+      });
+    } else {
+      // Just update the sets for this exercise
+      const updatedExercises = [...activeSession.exercises];
+      updatedExercises[exerciseIndex].sets = updatedSets;
+      updateActiveSession({ exercises: updatedExercises });
+    }
   };
 
   const handleStartEditSet = (exerciseIndex, setIndex) => {

@@ -12,11 +12,8 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
   // Timer state
   const [exerciseStartTime, setExerciseStartTime] = useState(Date.now());
   const [exerciseTime, setExerciseTime] = useState(0);
-  const [isResting, setIsResting] = useState(false);
   const [restTimeRemaining, setRestTimeRemaining] = useState(90);
-
-  // Track the last trigger timestamp to avoid duplicate processing
-  const lastTriggerTimestamp = useRef(null);
+  const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession);
 
   // Discard confirmation dialog
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
@@ -26,39 +23,49 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
 
   // Exercise timer - tracks time since exercise started
   useEffect(() => {
-    if (!activeSession || isResting) return;
+    if (!activeSession || activeSession.isResting) return;
 
     const interval = setInterval(() => {
       setExerciseTime(Math.floor((Date.now() - exerciseStartTime) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [exerciseStartTime, isResting, activeSession]);
+  }, [exerciseStartTime, activeSession?.isResting, activeSession]);
 
-  // Rest timer - counts down from 90 seconds
+  // Rest timer - calculates from timestamp (survives screen lock!)
   useEffect(() => {
-    if (!activeSession || !isResting) return;
+    if (!activeSession || !activeSession.isResting || !activeSession.restStartTime) return;
 
-    const interval = setInterval(() => {
-      setRestTimeRemaining((prev) => {
-        if (prev <= 1) {
-          // Rest time is up - celebration and switch back to exercise timer
-          confetti({
-            particleCount: 50,
-            spread: 70,
-            origin: { y: 0.3 },
-            colors: ['#F97316', '#10B981'],
-            scalar: 1.0,
-          });
-          setIsResting(false);
-          setRestTimeRemaining(90);
-          return 90;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const updateRestTimer = () => {
+      const elapsed = Math.floor((Date.now() - activeSession.restStartTime) / 1000);
+      const remaining = Math.max(0, 90 - elapsed);
 
+      setRestTimeRemaining(remaining);
+
+      // Rest time is up
+      if (remaining === 0) {
+        confetti({
+          particleCount: 50,
+          spread: 70,
+          origin: { y: 0.3 },
+          colors: ['#F97316', '#10B981'],
+          scalar: 1.0,
+        });
+
+        // Clear rest state in DynamoDB
+        updateActiveSession({
+          restStartTime: null,
+          isResting: false
+        });
+      }
+    };
+
+    // Initial calculation
+    updateRestTimer();
+
+    // Update every second
+    const interval = setInterval(updateRestTimer, 1000);
     return () => clearInterval(interval);
-  }, [isResting, activeSession]);
+  }, [activeSession?.isResting, activeSession?.restStartTime, activeSession, updateActiveSession]);
 
   // Reset exercise timer when changing exercises
   useEffect(() => {
@@ -67,21 +74,26 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
     console.log('[ActiveSessionHeader] Exercise changed to index:', currentExerciseIndex);
     setExerciseStartTime(Date.now());
     setExerciseTime(0);
-    setIsResting(false);
-    setRestTimeRemaining(90);
-  }, [currentExerciseIndex]); // Only depend on currentExerciseIndex, not entire activeSession!
+  }, [currentExerciseIndex, activeSession]); // Only depend on currentExerciseIndex, not entire activeSession!
 
-  // Listen for rest timer trigger from store (using timestamp to track unique triggers)
+  // Page Visibility API - recalculate timers when screen unlocks
   useEffect(() => {
-    const triggerTimestamp = activeSession?.triggerRestTimerTimestamp;
+    const handleVisibilityChange = () => {
+      if (!document.hidden && activeSession) {
+        console.log('[ActiveSessionHeader] 🔓 Screen unlocked - recalculating timers');
 
-    if (triggerTimestamp && triggerTimestamp !== lastTriggerTimestamp.current) {
-      console.log('[ActiveSessionHeader] 🟠 Rest timer triggered at:', triggerTimestamp);
-      lastTriggerTimestamp.current = triggerTimestamp;
-      setIsResting(true);
-      setRestTimeRemaining(90);
-    }
-  }, [activeSession?.triggerRestTimerTimestamp]);
+        // Recalculate exercise time
+        if (!activeSession.isResting) {
+          setExerciseTime(Math.floor((Date.now() - exerciseStartTime) / 1000));
+        }
+
+        // Rest timer will auto-recalculate from restStartTime in its useEffect
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [activeSession, exerciseStartTime]);
 
   // If no active session, don't render
   if (!activeSession) {
@@ -89,6 +101,21 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
   }
 
   const currentExercise = activeSession.exercises[currentExerciseIndex];
+
+  const isResting = activeSession.isResting || false;
+
+  // Safely calculate total workout duration
+  // startTime should be in milliseconds, but guard against seconds (Unix timestamp)
+  const totalExerciseTime = (() => {
+    if (!activeSession.startTime) return 0;
+    const now = Date.now();
+    const start = activeSession.startTime;
+
+    // If startTime looks like Unix seconds (< year 2000 in ms), convert to ms
+    const startMs = start < 946684800000 ? start * 1000 : start;
+
+    return Math.floor((now - startMs) / 1000);
+  })();
 
   return (
     <motion.div
@@ -100,7 +127,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
       <motion.div
         className="border-b-4 border-mono-900"
         animate={{
-          backgroundColor: isResting ? '#ea580c' : '#111827'
+          backgroundColor: isResting ? '#ec4899' : '#111827'
         }}
         transition={{ duration: 0.5 }}
       >
@@ -116,20 +143,9 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
           />
         </div>
 
-        {/* Stats Row */}
-        <div className="px-4 py-4 flex items-center justify-between">
-          {/* Exercise Progress */}
-          <div className="flex items-center gap-3">
-            <Dumbbell className="w-5 h-5 text-white" strokeWidth={2.5} />
-            <div>
-              <div className="text-xs text-white/60 uppercase tracking-wide mb-0.5">Exercise</div>
-              <div className="text-xl font-black text-white tabular-nums">
-                {currentExerciseIndex + 1}/{activeSession.exercises.length}
-              </div>
-            </div>
-          </div>
-
-          {/* Timer Display */}
+        {/* Stats Container - Clear typographic hierarchy */}
+        <div className="px-4 py-6">
+          {/* PRIMARY: Current Timer - Dominant element */}
           <AnimatePresence mode="wait">
             {isResting ? (
               <motion.div
@@ -138,23 +154,34 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.8, opacity: 0, y: 10 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-center gap-2"
+                className="flex items-center gap-4 mb-6"
               >
                 <motion.div
-                  animate={{ rotate: [0, 10, -10, 0] }}
-                  transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
+                  animate={{
+                    rotate: [0, -15, 15, -15, 15, 0],
+                    scale: [1, 1.1, 1, 1.1, 1]
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
                 >
-                  <Clock className="w-5 h-5 text-orange-300" strokeWidth={2.5} />
+                  <Clock className="w-10 h-10 text-pink-400" strokeWidth={2.5} />
                 </motion.div>
-                <div className="text-center">
-                  <div className="text-xs text-orange-200 uppercase tracking-wide mb-0.5 font-bold">Rest</div>
+                <div className="flex-1">
+                  <div className="text-xs text-pink-300 uppercase tracking-widest mb-1 font-bold">Rest</div>
                   <motion.div
-                    className="text-xl font-black text-orange-300 tabular-nums"
+                    className="text-5xl font-black text-pink-400 tabular-nums leading-none"
                     animate={{
                       scale: restTimeRemaining <= 10 ? [1, 1.1, 1] : 1,
-                      color: restTimeRemaining <= 10 ? ['#fdba74', '#fbbf24', '#fdba74'] : '#fdba74'
+                      color: restTimeRemaining <= 10 ? ['#f9a8d4', '#ec4899', '#f9a8d4'] : '#f9a8d4'
                     }}
-                    transition={{ duration: 0.5, repeat: restTimeRemaining <= 10 ? Infinity : 0 }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: restTimeRemaining <= 10 ? Infinity : 0,
+                      ease: "easeInOut"
+                    }}
                   >
                     {Math.floor(restTimeRemaining / 60)}:{String(restTimeRemaining % 60).padStart(2, '0')}
                   </motion.div>
@@ -167,59 +194,80 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.8, opacity: 0, y: -10 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-center gap-2"
+                className="flex items-center gap-4 mb-6"
               >
-                <Clock className="w-5 h-5 text-white" strokeWidth={2.5} />
-                <div className="text-center">
-                  <div className="text-xs text-white/60 uppercase tracking-wide mb-0.5">Time</div>
-                  <div className="text-xl font-black text-white tabular-nums">
-                    {formatDuration(exerciseTime)}
+                <Clock className="w-10 h-10 text-white" strokeWidth={2.5} />
+                <div className="flex-1">
+                  <div className="text-xs text-white/60 uppercase tracking-widest mb-1">Exercise Time</div>
+                  <div className="text-5xl font-black text-white tabular-nums leading-none">
+                    {Math.floor(exerciseTime / 60)}:{String(exerciseTime % 60).padStart(2, '0')}
                   </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Resume Button - Only show when NOT on logger view */}
-          <AnimatePresence>
-            {!isOnLoggerView && (
-              <motion.button
-                key="resume-button"
-                initial={{ scale: 0, opacity: 0, x: 20 }}
-                animate={{ scale: 1, opacity: 1, x: 0 }}
-                exit={{ scale: 0, opacity: 0, x: 20 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 20
-                }}
-                onClick={onNavigateToLogger}
-                className="px-6 py-2 bg-white text-mono-900 font-bold uppercase text-sm tracking-wide hover:bg-white/90 transition-colors flex items-center gap-2"
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.05 }}
-              >
-                <span>Resume</span>
-                <motion.span
-                  animate={{ x: [0, 3, 0] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+          {/* SECONDARY: Context info - smaller, consistent sizing */}
+          <div className="flex items-center justify-between text-white/80 mb-4">
+            <div className="flex items-center gap-2">
+              <Dumbbell className="w-4 h-4" strokeWidth={2.5} />
+              <span className="text-sm font-medium">
+                Exercise {currentExerciseIndex + 1}/{activeSession.exercises.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" strokeWidth={2.5} />
+              <span className="text-sm font-medium">
+                {Math.floor(totalExerciseTime / 60)}m total
+              </span>
+            </div>
+          </div>
+
+          {/* TERTIARY: Action buttons - clear hierarchy */}
+          <div className="flex gap-2">
+            {/* Resume Button - Only show when NOT on logger view */}
+            <AnimatePresence>
+              {!isOnLoggerView && (
+                <motion.button
+                  key="resume-button"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 20
+                  }}
+                  onClick={onNavigateToLogger}
+                  className="flex-1 px-6 py-3 bg-white text-mono-900 font-bold uppercase text-sm tracking-wide hover:bg-white/90 transition-colors flex items-center justify-center gap-2"
+                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.02 }}
                 >
-                  →
-                </motion.span>
+                  <span>Resume Workout</span>
+                  <motion.span
+                    animate={{ x: [0, 3, 0] }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    →
+                  </motion.span>
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            {/* Discard Button - Only show on logger view */}
+            {isOnLoggerView && (
+              <motion.button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDiscardDialog(true);
+                }}
+                className="ml-auto text-white/60 hover:text-white p-2"
+                whileTap={{ scale: 0.95 }}
+              >
+                <Trash2 className="w-5 h-5" strokeWidth={2.5} />
               </motion.button>
             )}
-          </AnimatePresence>
-
-          {/* Discard Button */}
-          <motion.button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDiscardDialog(true);
-            }}
-            className="text-white/60 hover:text-white"
-            whileTap={{ scale: 0.95 }}
-          >
-            <Trash2 className="w-5 h-5" strokeWidth={2.5} />
-          </motion.button>
+          </div>
         </div>
       </motion.div>
 

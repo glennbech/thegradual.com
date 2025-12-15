@@ -5,13 +5,17 @@ import { staggerContainer, staggerItem, pageTransition } from '../utils/animatio
 import { getMuscleColor } from '../utils/design-system'
 import ExerciseCard from './ExerciseCard'
 import CreateExerciseCard from './CreateExerciseCard'
+import ExerciseAddedToast from './ExerciseAddedToast'
 import defaultExercises from '../data/exercises.json'
 import useWorkoutStore from '../stores/workoutStore'
 
-export default function Plan({ onStartSession, editTemplate, onEditComplete }) {
+export default function Plan({ onStartSession, editTemplate, onEditComplete, onNavigateToLogger }) {
   const deleteCustomExercise = useWorkoutStore((state) => state.deleteCustomExercise)
   const addCustomTemplate = useWorkoutStore((state) => state.addCustomTemplate)
   const updateCustomTemplate = useWorkoutStore((state) => state.updateCustomTemplate)
+  const activeSession = useWorkoutStore((state) => state.activeSession)
+  const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession)
+  const getPreviousSessionForExercise = useWorkoutStore((state) => state.getPreviousSessionForExercise)
 
   const [exercises, setExercises] = useState([])
   const [selectedExercises, setSelectedExercises] = useState([])
@@ -29,6 +33,8 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete }) {
   })
   const [isSaving, setIsSaving] = useState(false)
   const [isEditing, setIsEditing] = useState(false) // Track if we're editing a template
+  const [showAddedDialog, setShowAddedDialog] = useState(false)
+  const [addedExerciseInfo, setAddedExerciseInfo] = useState({ name: '', category: '' })
 
   useEffect(() => {
     loadExercises()
@@ -66,6 +72,73 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete }) {
   }
 
   const handleAddExercise = (exercise) => {
+    // Check if there's an active workout session
+    if (activeSession) {
+      // Add exercise to active session
+      const exerciseType = exercise.exerciseType || 'weight+reps'
+
+      // Try to get previous session data for this exercise
+      const prevExercise = getPreviousSessionForExercise(exercise.id)
+
+      // Copy sets from previous session if available, otherwise use defaults
+      let defaultSets = []
+
+      if (prevExercise && prevExercise.sets && prevExercise.sets.length > 0) {
+        // Copy sets from previous session, marking as planned (not completed)
+        defaultSets = prevExercise.sets.map((set) => ({
+          ...(set.reps !== undefined && { reps: set.reps }),
+          ...(set.weight !== undefined && { weight: set.weight }),
+          ...(set.duration !== undefined && { duration: set.duration }),
+          setType: set.setType || 'working',
+          completed: false, // Mark as planned, not completed
+          plannedFromPrevious: true,
+        }))
+      } else {
+        // No previous data - use defaults based on exercise type
+        if (exerciseType === 'time-based') {
+          defaultSets = [
+            { duration: 30, completed: false, setType: 'working' },
+            { duration: 30, completed: false, setType: 'working' },
+            { duration: 30, completed: false, setType: 'working' },
+          ]
+        } else if (exerciseType === 'reps-only') {
+          defaultSets = [
+            { reps: 10, completed: false, setType: 'working' },
+            { reps: 10, completed: false, setType: 'working' },
+            { reps: 10, completed: false, setType: 'working' },
+          ]
+        } else {
+          // weight+reps (default)
+          defaultSets = [
+            { reps: 10, weight: 20, completed: false, setType: 'working' },
+            { reps: 10, weight: 20, completed: false, setType: 'working' },
+            { reps: 10, weight: 20, completed: false, setType: 'working' },
+          ]
+        }
+      }
+
+      const newExercise = {
+        ...exercise,
+        sets: defaultSets
+      }
+
+      const updatedExercises = [...activeSession.exercises, newExercise]
+
+      updateActiveSession({
+        exercises: updatedExercises
+      })
+
+      // Show dialog instead of alert
+      setAddedExerciseInfo({
+        name: exercise.name,
+        category: exercise.category
+      })
+      setShowAddedDialog(true)
+
+      return
+    }
+
+    // No active session - use normal plan builder behavior
     if (!selectedExercises.find(e => e.id === exercise.id)) {
       const newSelectedExercises = [...selectedExercises, exercise]
       setSelectedExercises(newSelectedExercises)
@@ -564,6 +637,15 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete }) {
           </motion.div>
         </motion.div>
       )}
+
+      {/* Added to Workout Toast */}
+      <ExerciseAddedToast
+        isOpen={showAddedDialog}
+        onClose={() => setShowAddedDialog(false)}
+        exerciseName={addedExerciseInfo.name}
+        exerciseCategory={addedExerciseInfo.category}
+        onViewWorkout={onNavigateToLogger}
+      />
     </motion.div>
   )
 }

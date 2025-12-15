@@ -307,6 +307,7 @@ function AppContent() {
                   onStartSession={handleStartSession}
                   editTemplate={templateToEdit}
                   onEditComplete={() => setTemplateToEdit(null)}
+                  onNavigateToLogger={handleNavigateToLogger}
                 />
               )}
 
@@ -351,13 +352,13 @@ function AppContent() {
                     window.history.pushState({ view: item.id }, '', path)
                   }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex flex-col items-center gap-1 px-6 py-2 transition-all border-b-2 ${
+                  className={`flex flex-col items-center gap-1 px-4 py-2 transition-all border-b-2 ${
                     isActive
                       ? 'border-mono-900 text-mono-900'
                       : 'border-transparent text-mono-500 hover:text-mono-700'
                   }`}
                 >
-                  <Icon className="w-5 h-5" strokeWidth={2} />
+                  <Icon className="w-4 h-4" strokeWidth={2} />
                   <span className="text-xs font-medium uppercase tracking-wide">{item.label}</span>
                 </motion.button>
               )
