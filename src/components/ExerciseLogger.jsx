@@ -19,6 +19,8 @@ import { ComparisonRow } from './ComparisonBadge';
 import { getMuscleColor, formatDuration, colors, comparePerformance } from '../utils/design-system';
 import ConfirmDialog from './ConfirmDialog';
 import ExerciseDetailModal from './ExerciseDetailModal';
+import ExerciseVictoryScreen from './ExerciseVictoryScreen';
+import { analyzeExercisePerformance } from '../utils/exerciseStats';
 
 export default function ExerciseLogger({
   exercises,
@@ -62,6 +64,10 @@ export default function ExerciseLogger({
     message: '',
     variant: 'success'
   });
+
+  // Exercise Victory Screen
+  const [showVictoryScreen, setShowVictoryScreen] = useState(false);
+  const [victoryData, setVictoryData] = useState(null);
 
   // Celebration effects
   const celebrateSet = () => {
@@ -246,10 +252,15 @@ export default function ExerciseLogger({
       // Check if all sets are now complete
       const allSetsComplete = updatedSets.every(s => s.completed !== false);
       if (allSetsComplete) {
-        // Delay exercise celebration slightly so it doesn't overlap with set celebration
+        // All sets complete! Show victory screen with stats
         setTimeout(() => {
-          celebrateExercise();
-        }, 300);
+          const stats = analyzeExercisePerformance(exercise, sessions);
+          setVictoryData({
+            exercise: exercise,
+            stats: stats
+          });
+          setShowVictoryScreen(true);
+        }, 500); // Small delay for set confetti to finish
       } else {
         // Start rest timer after completing a set (but not the last one)
         // Store rest start time in DynamoDB for accurate calculation
@@ -900,6 +911,18 @@ export default function ExerciseLogger({
           </motion.button>
         </div>
       </div>
+
+      {/* Exercise Victory Screen */}
+      {showVictoryScreen && victoryData && (
+        <ExerciseVictoryScreen
+          exercise={victoryData.exercise}
+          stats={victoryData.stats}
+          onDismiss={() => {
+            setShowVictoryScreen(false);
+            setVictoryData(null);
+          }}
+        />
+      )}
     </>
   );
 }

@@ -1,8 +1,9 @@
-import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download } from 'lucide-react';
+import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { awsConfig } from '../config/aws';
 import useWorkoutStore from '../stores/workoutStore';
+import { exportWorkoutDataToPDF } from '../utils/pdfExport';
 
 export default function Profile() {
   const { user, identityId, isAuthenticated, signIn, signOut } = useAuth();
@@ -75,6 +76,19 @@ export default function Profile() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  // Export all user data as PDF for AI analysis
+  const handleDownloadPDF = () => {
+    const allData = {
+      sessions: sessions,
+      customExercises: customExercises,
+      customTemplates: customTemplates,
+      activeSession: activeSession,
+      user: user || null
+    };
+
+    exportWorkoutDataToPDF(allData);
   };
 
   if (!isAuthenticated) {
@@ -326,15 +340,24 @@ export default function Profile() {
             Your Data
           </h2>
           <p className="text-sm text-mono-600 mb-4">
-            Download all your workout data as a JSON file. Includes sessions, custom exercises, and templates.
+            Download all your workout data for analysis or backup. Choose PDF for AI analysis or JSON for raw data.
           </p>
-          <button
-            onClick={handleDownloadAllData}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#6366F1] hover:bg-[#4F46E5] text-white rounded-lg border-2 border-[#6366F1] transition-colors font-semibold uppercase tracking-wide text-sm"
-          >
-            <Download className="w-5 h-5" strokeWidth={2} />
-            Download All Your Data
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-[#6366F1] hover:bg-[#4F46E5] text-white rounded-lg border-2 border-[#6366F1] transition-colors font-semibold uppercase tracking-wide text-sm"
+            >
+              <FileText className="w-5 h-5" strokeWidth={2} />
+              Export PDF
+            </button>
+            <button
+              onClick={handleDownloadAllData}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-mono-50 text-[#6366F1] rounded-lg border-2 border-[#6366F1] transition-colors font-semibold uppercase tracking-wide text-sm"
+            >
+              <Download className="w-5 h-5" strokeWidth={2} />
+              Download JSON
+            </button>
+          </div>
         </div>
 
         {/* Actions */}
