@@ -80,13 +80,45 @@ export const AuthProvider = ({ children }) => {
         }
         // Check for existing session
         const savedIdToken = localStorage.getItem('idToken');
-        if (savedIdToken && !isTokenExpired(savedIdToken)) {
-          // User is authenticated
-          const userInfo = parseJWT(savedIdToken);
-          setUser(userInfo);
-          setIsAuthenticated(true);
+        if (savedIdToken) {
+          // Check if token is expired
+          if (isTokenExpired(savedIdToken)) {
+            console.log('🔄 Token expired on app load, attempting refresh...');
+            // Try to refresh the token
+            const newToken = await refreshToken();
+            if (newToken) {
+              // Successfully refreshed
+              const userInfo = parseJWT(newToken);
+              setUser(userInfo);
+              setIsAuthenticated(true);
+            } else {
+              // Refresh failed, user is anonymous
+              console.log('❌ Token refresh failed on app load, user is now anonymous');
+              setIsAuthenticated(false);
+              setUser(null);
+            }
+          } else if (isTokenExpiringSoon(savedIdToken, 60)) {
+            // Token expires in < 60 minutes, proactively refresh
+            console.log('🔄 Token expiring soon, proactively refreshing...');
+            const newToken = await refreshToken();
+            if (newToken) {
+              const userInfo = parseJWT(newToken);
+              setUser(userInfo);
+              setIsAuthenticated(true);
+            } else {
+              // Refresh failed but old token still valid, use it
+              const userInfo = parseJWT(savedIdToken);
+              setUser(userInfo);
+              setIsAuthenticated(true);
+            }
+          } else {
+            // Token is valid and not expiring soon
+            const userInfo = parseJWT(savedIdToken);
+            setUser(userInfo);
+            setIsAuthenticated(true);
+          }
         } else {
-          // User is anonymous - no credentials needed
+          // No token, user is anonymous
           setIsAuthenticated(false);
           setUser(null);
         }
@@ -309,25 +341,30 @@ export const AuthProvider = ({ children }) => {
 
   const refreshToken = async () => {
     try {
+      console.log('🔄 Attempting to refresh token...');
       const response = await fetch(`${awsConfig.bffEndpoint}/auth/refresh`, {
         method: 'POST',
         credentials: 'include' // Send refresh token cookie
       });
 
       if (!response.ok) {
+        console.error('❌ Token refresh failed:', response.status);
         throw new Error('Token refresh failed');
       }
 
       const data = await response.json();
 
-      // Update stored token
-      localStorage.setItem('idToken', data.access_token);
+      // The refresh endpoint returns { id_token, access_token, expires_in, user }
+      // Store the ID token for authentication
+      localStorage.setItem('idToken', data.id_token);
       setUser(data.user);
 
-      return data.access_token;
+      console.log('✅ Token refreshed successfully');
+      return data.id_token;
     } catch (error) {
-      console.error('Token refresh error:', error);
+      console.error('❌ Token refresh error:', error);
       // If refresh fails, sign out
+      console.log('🔄 Refresh failed, signing out user...');
       await signOut();
       return null;
     }

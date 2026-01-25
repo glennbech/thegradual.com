@@ -13,6 +13,7 @@ export default function Profile() {
   const customExercises = useWorkoutStore((state) => state.customExercises);
   const customTemplates = useWorkoutStore((state) => state.customTemplates);
   const activeSession = useWorkoutStore((state) => state.activeSession);
+  const bodyMeasurements = useWorkoutStore((state) => state.bodyMeasurements);
 
   // Get localStorage stats for debug
   const getLocalStorageStats = () => {
@@ -62,6 +63,7 @@ export default function Profile() {
       customExercises: customExercises,
       customTemplates: customTemplates,
       activeSession: activeSession,
+      bodyMeasurements: bodyMeasurements,
       exportDate: new Date().toISOString(),
       user: user || null
     };
@@ -85,6 +87,7 @@ export default function Profile() {
       customExercises: customExercises,
       customTemplates: customTemplates,
       activeSession: activeSession,
+      bodyMeasurements: bodyMeasurements,
       user: user || null
     };
 

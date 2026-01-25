@@ -19,6 +19,7 @@ const API_TIMEOUT = 10000; // 10 seconds
  * @property {Array} customExercises - User-created exercises
  * @property {Array} customTemplates - Modified templates
  * @property {Object|null} activeSession - Current in-progress workout
+ * @property {Array} bodyMeasurements - Body measurements (weight, body fat, etc.)
  * @property {string} lastUpdated - ISO timestamp of last update
  */
 
@@ -70,6 +71,7 @@ export async function fetchUserState() {
       customExercises: JSON.parse(data.customExercises || '[]'),
       customTemplates: JSON.parse(data.customTemplates || '[]'),
       activeSession: JSON.parse(data.activeSession || 'null'),
+      bodyMeasurements: JSON.parse(data.bodyMeasurements || '[]'),
       lastUpdated: data.lastUpdated,
     };
 
@@ -78,6 +80,7 @@ export async function fetchUserState() {
       parsedData.sessions.length === 0 &&
       parsedData.customExercises.length === 0 &&
       parsedData.customTemplates.length === 0 &&
+      parsedData.bodyMeasurements.length === 0 &&
       !parsedData.activeSession;
 
     if (isEmpty) {
@@ -90,6 +93,7 @@ export async function fetchUserState() {
         customExercises: [],
         customTemplates: [],
         activeSession: null,
+        bodyMeasurements: [],
         lastUpdated: '',
       };
     }
@@ -113,6 +117,7 @@ export async function fetchUserState() {
  * @param {Array} state.customExercises - User-created exercises
  * @param {Array} state.customTemplates - Modified templates
  * @param {Object|null} state.activeSession - Current workout
+ * @param {Array} state.bodyMeasurements - Body measurements
  * @returns {Promise<Object>} Response with new version
  * @throws {ConflictError} If version conflict detected (409)
  */
@@ -127,6 +132,7 @@ export async function saveUserState(state) {
     customExercises: JSON.stringify(state.customExercises || []),
     customTemplates: JSON.stringify(state.customTemplates || []),
     activeSession: JSON.stringify(state.activeSession || null),
+    bodyMeasurements: JSON.stringify(state.bodyMeasurements || []),
     lastUpdated: new Date().toISOString(),
   };
 

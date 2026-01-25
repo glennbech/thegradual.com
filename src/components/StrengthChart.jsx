@@ -2,28 +2,46 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 /**
- * Minimal line chart for e1RM progression
+ * Minimal line chart for progression tracking (e1RM, weight, body fat, etc.)
  * Follows flat 2D design system - no gradients or 3D effects
+ *
+ * @param {Array} data - Array of data points with date and value fields
+ * @param {string} valueField - Field name to plot (default: 'e1rm')
+ * @param {string} unit - Unit suffix for values (default: 'kg')
+ * @param {string} color - Line color (default: '#6366F1')
+ * @param {number} height - Chart height in pixels (default: 200)
+ * @param {string} label - Label for the metric (default: 'Value')
  */
-export default function StrengthChart({ data, color = '#6366F1', height = 200 }) {
+export default function StrengthChart({
+  data,
+  valueField = 'e1rm',
+  unit = 'kg',
+  color = '#6366F1',
+  height = 200,
+  label = 'Value'
+}) {
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return null;
 
-    const values = data.map(d => d.e1rm);
+    // Filter out data points that don't have the specified field
+    const validData = data.filter(d => d[valueField] != null);
+    if (validData.length === 0) return null;
+
+    const values = validData.map(d => d[valueField]);
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
     const range = maxValue - minValue;
-    const padding = range * 0.1; // 10% padding
+    const padding = range > 0 ? range * 0.1 : 1; // 10% padding, or 1 if no range
 
     const yMin = minValue - padding;
     const yMax = maxValue + padding;
-    const yRange = yMax - yMin;
+    const yRange = yMax - yMin || 1; // Avoid division by zero
 
     return {
-      points: data.map((d, i) => ({
-        x: (i / (data.length - 1)) * 100,
-        y: 100 - ((d.e1rm - yMin) / yRange) * 100,
-        value: d.e1rm,
+      points: validData.map((d, i) => ({
+        x: (i / (validData.length - 1 || 1)) * 100,
+        y: 100 - ((d[valueField] - yMin) / yRange) * 100,
+        value: d[valueField],
         date: d.date
       })),
       yMin,
@@ -31,15 +49,15 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
       minValue,
       maxValue
     };
-  }, [data]);
+  }, [data, valueField]);
 
   if (!chartData || data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center text-mono-500 text-sm"
+        className="flex items-center justify-center text-mono-500 text-sm bg-mono-50 rounded border border-mono-200"
         style={{ height }}
       >
-        No progression data available
+        No {label.toLowerCase()} data available
       </div>
     );
   }
@@ -49,13 +67,18 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
     .map((point, i) => `${i === 0 ? 'M' : 'L'} ${point.x},${point.y}`)
     .join(' ');
 
+  // Format value with unit
+  const formatValue = (value) => {
+    return `${Math.round(value * 10) / 10}${unit}`;
+  };
+
   return (
     <div className="relative" style={{ height }}>
       {/* Y-axis labels */}
       <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-xs text-mono-500 pr-2">
-        <div className="text-right">{Math.round(chartData.yMax)}kg</div>
-        <div className="text-right">{Math.round((chartData.yMax + chartData.yMin) / 2)}kg</div>
-        <div className="text-right">{Math.round(chartData.yMin)}kg</div>
+        <div className="text-right">{formatValue(chartData.yMax)}</div>
+        <div className="text-right">{formatValue((chartData.yMax + chartData.yMin) / 2)}</div>
+        <div className="text-right">{formatValue(chartData.yMin)}</div>
       </div>
 
       {/* Chart area */}
@@ -113,7 +136,7 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
               {/* Tooltip */}
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
                 <div className="bg-white border-2 rounded px-2 py-1 text-xs whitespace-nowrap shadow-md" style={{ borderColor: color }}>
-                  <div className="font-semibold text-mono-900">{point.value}kg</div>
+                  <div className="font-semibold text-mono-900">{formatValue(point.value)}</div>
                   <div className="text-mono-500">{new Date(point.date).toLocaleDateString()}</div>
                 </div>
               </div>
@@ -126,16 +149,16 @@ export default function StrengthChart({ data, color = '#6366F1', height = 200 })
       <div className="mt-2 flex justify-between text-xs text-mono-500">
         <div>
           <span className="text-mono-400">First: </span>
-          <span className="font-semibold text-mono-900">{chartData.minValue}kg</span>
+          <span className="font-semibold text-mono-900">{formatValue(chartData.minValue)}</span>
         </div>
         <div>
           <span className="text-mono-400">Latest: </span>
-          <span className="font-semibold text-mono-900">{chartData.maxValue}kg</span>
+          <span className="font-semibold text-mono-900">{formatValue(chartData.maxValue)}</span>
         </div>
         <div>
-          <span className="text-mono-400">Gain: </span>
+          <span className="text-mono-400">Change: </span>
           <span className="font-semibold" style={{ color }}>
-            +{Math.round((chartData.maxValue - chartData.minValue) * 10) / 10}kg
+            {chartData.maxValue >= chartData.minValue ? '+' : ''}{formatValue(chartData.maxValue - chartData.minValue)}
           </span>
         </div>
       </div>

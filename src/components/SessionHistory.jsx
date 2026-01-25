@@ -189,8 +189,8 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
 
   const handleSetFieldChange = (field, value, e) => {
     e.stopPropagation();
-    // Validate numeric input
-    const numValue = parseFloat(value);
+    // Validate numeric input (normalize comma to period for European decimals)
+    const numValue = parseFloat(String(value).replace(',', '.'));
     if (isNaN(numValue) || numValue < 0) return;
 
     // Apply limits

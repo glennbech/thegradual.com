@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
  * Generates a results-focused PDF export of workout data formatted for AI analysis
  * @param {Object} data - The workout data to export
  * @param {Array} data.sessions - All completed workout sessions
+ * @param {Array} data.bodyMeasurements - All body measurements
  * @param {Object} data.user - User information
  * @returns {void} - Downloads PDF file
  */
@@ -321,6 +322,183 @@ export function exportWorkoutDataToPDF(data) {
       }
 
       // Add separator line
+      doc.setDrawColor(...colors.background);
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 8;
+    });
+  }
+
+  // ========================================
+  // BODY MEASUREMENTS
+  // ========================================
+  if (data.bodyMeasurements && data.bodyMeasurements.length > 0) {
+    doc.addPage();
+    yPosition = margin;
+
+    addSectionHeader('Body Measurements', true);
+
+    // Sort measurements by date (newest first)
+    const sortedMeasurements = [...data.bodyMeasurements].sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
+    const latestMeasurement = sortedMeasurements[0];
+
+    // Latest Measurements - Metric Cards
+    yPosition += 5;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...colors.text);
+    doc.text('Latest Measurements', margin, yPosition);
+    yPosition += 8;
+
+    // Determine which measurements to show
+    const measurementCards = [];
+    if (latestMeasurement.weight) {
+      measurementCards.push({ label: 'Weight', value: `${latestMeasurement.weight} kg` });
+    }
+    if (latestMeasurement.bodyFatPercentage) {
+      measurementCards.push({ label: 'Body Fat', value: `${latestMeasurement.bodyFatPercentage}%` });
+    }
+    if (latestMeasurement.waist) {
+      measurementCards.push({ label: 'Waist', value: `${latestMeasurement.waist} cm` });
+    }
+    if (latestMeasurement.chest) {
+      measurementCards.push({ label: 'Chest', value: `${latestMeasurement.chest} cm` });
+    }
+
+    // Draw metric cards (2 per row)
+    const cardsPerRow = 2;
+    const cardWidth = (pageWidth - 2 * margin - 5) / cardsPerRow;
+    measurementCards.forEach((card, index) => {
+      const row = Math.floor(index / cardsPerRow);
+      const col = index % cardsPerRow;
+      const x = margin + col * (cardWidth + 5);
+      const y = yPosition + row * 25;
+
+      addMetricCard(card.label, card.value, x, y, cardWidth);
+    });
+
+    yPosition += Math.ceil(measurementCards.length / cardsPerRow) * 25 + 10;
+
+    // Measurement History
+    checkPageBreak(20);
+    addSectionHeader('Measurement History', false);
+    yPosition += 5;
+
+    sortedMeasurements.forEach((measurement, index) => {
+      checkPageBreak(25);
+
+      // Measurement date header
+      const measurementDate = new Date(measurement.date);
+
+      doc.setFillColor(...colors.background);
+      doc.roundedRect(margin, yPosition - 2, pageWidth - 2 * margin, 10, 1, 1, 'F');
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...colors.text);
+      doc.text(measurementDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), margin + 3, yPosition + 4);
+
+      if (index === 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...colors.secondary);
+        doc.text('Latest', pageWidth - margin - 3, yPosition + 4, { align: 'right' });
+      }
+
+      yPosition += 13;
+
+      // Measurement details in two columns
+      const leftColumnX = margin + 3;
+      const rightColumnX = pageWidth / 2 + 5;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+
+      let leftYOffset = yPosition;
+      let rightYOffset = yPosition;
+
+      // Core measurements (left column)
+      if (measurement.weight) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Weight:', leftColumnX, leftYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.weight} kg`, leftColumnX + 25, leftYOffset);
+        leftYOffset += 5;
+      }
+
+      if (measurement.bodyFatPercentage) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Body Fat:', leftColumnX, leftYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.bodyFatPercentage}%`, leftColumnX + 25, leftYOffset);
+        leftYOffset += 5;
+      }
+
+      if (measurement.waist) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Waist:', leftColumnX, leftYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.waist} cm`, leftColumnX + 25, leftYOffset);
+        leftYOffset += 5;
+      }
+
+      if (measurement.chest) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Chest:', leftColumnX, leftYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.chest} cm`, leftColumnX + 25, leftYOffset);
+        leftYOffset += 5;
+      }
+
+      // Additional measurements (right column)
+      if (measurement.hips) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Hips:', rightColumnX, rightYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.hips} cm`, rightColumnX + 25, rightYOffset);
+        rightYOffset += 5;
+      }
+
+      if (measurement.arms) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Arms:', rightColumnX, rightYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.arms} cm`, rightColumnX + 25, rightYOffset);
+        rightYOffset += 5;
+      }
+
+      if (measurement.thighs) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Thighs:', rightColumnX, rightYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.thighs} cm`, rightColumnX + 25, rightYOffset);
+        rightYOffset += 5;
+      }
+
+      if (measurement.calves) {
+        doc.setTextColor(...colors.secondary);
+        doc.text('Calves:', rightColumnX, rightYOffset);
+        doc.setTextColor(...colors.text);
+        doc.text(`${measurement.calves} cm`, rightColumnX + 25, rightYOffset);
+        rightYOffset += 5;
+      }
+
+      // Notes (full width if present)
+      if (measurement.notes) {
+        const maxOffset = Math.max(leftYOffset, rightYOffset);
+        yPosition = maxOffset + 3;
+        doc.setTextColor(...colors.secondary);
+        doc.setFont('helvetica', 'italic');
+        doc.text(`Notes: ${measurement.notes}`, leftColumnX, yPosition);
+        yPosition += 5;
+      } else {
+        yPosition = Math.max(leftYOffset, rightYOffset) + 2;
+      }
+
+      // Separator line
       doc.setDrawColor(...colors.background);
       doc.setLineWidth(0.5);
       doc.line(margin, yPosition, pageWidth - margin, yPosition);

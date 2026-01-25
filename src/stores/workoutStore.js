@@ -18,6 +18,7 @@ const useWorkoutStore = create((set, get) => ({
       activeSession: null,
       customExercises: [],
       customTemplates: [],
+      bodyMeasurements: [],
       isOnline: navigator.onLine,
       isLoading: false, // Track loading state for API operations
 
@@ -549,6 +550,137 @@ const useWorkoutStore = create((set, get) => ({
       },
 
       // ==========================================
+      // BODY MEASUREMENTS ACTIONS
+      // ==========================================
+
+      /**
+       * Add body measurement
+       * API-FIRST: Saves to DynamoDB before updating local state
+       */
+      addBodyMeasurement: async (measurement) => {
+        const { isOnline, bodyMeasurements } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot add measurement while offline');
+        }
+
+        set({ isLoading: true });
+
+        const newMeasurement = {
+          ...measurement,
+          id: `measurement-${Date.now()}`,
+          date: measurement.date || new Date().toISOString(),
+        };
+
+        const updatedMeasurements = [...bodyMeasurements, newMeasurement]
+          .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort newest first
+
+        try {
+          const state = get();
+          await state._saveWithVersion({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+            bodyMeasurements: updatedMeasurements,
+          });
+
+          set({ bodyMeasurements: updatedMeasurements, isLoading: false });
+          console.log('[workoutStore] Body measurement added and saved to DynamoDB');
+          return newMeasurement;
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to add body measurement:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Update body measurement
+       * API-FIRST: Saves to DynamoDB before updating local state
+       */
+      updateBodyMeasurement: async (measurementId, updates) => {
+        const { isOnline, bodyMeasurements } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot update measurement while offline');
+        }
+
+        set({ isLoading: true });
+
+        const updatedMeasurements = bodyMeasurements
+          .map((m) => (m.id === measurementId ? { ...m, ...updates } : m))
+          .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        try {
+          const state = get();
+          await state._saveWithVersion({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+            bodyMeasurements: updatedMeasurements,
+          });
+
+          set({ bodyMeasurements: updatedMeasurements, isLoading: false });
+          console.log('[workoutStore] Body measurement updated and saved to DynamoDB');
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to update body measurement:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Delete body measurement
+       * API-FIRST: Saves to DynamoDB before updating local state
+       */
+      deleteBodyMeasurement: async (measurementId) => {
+        const { isOnline, bodyMeasurements } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot delete measurement while offline');
+        }
+
+        set({ isLoading: true });
+
+        const updatedMeasurements = bodyMeasurements.filter((m) => m.id !== measurementId);
+
+        try {
+          const state = get();
+          await state._saveWithVersion({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+            bodyMeasurements: updatedMeasurements,
+          });
+
+          set({ bodyMeasurements: updatedMeasurements, isLoading: false });
+          console.log('[workoutStore] Body measurement deleted and saved to DynamoDB');
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to delete body measurement:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Get all body measurements (sorted newest first)
+       */
+      getBodyMeasurements: () => {
+        return get().bodyMeasurements;
+      },
+
+      /**
+       * Get latest body measurement
+       */
+      getLatestBodyMeasurement: () => {
+        const measurements = get().bodyMeasurements;
+        return measurements.length > 0 ? measurements[0] : null;
+      },
+
+      // ==========================================
       // DATA LOADING & CONNECTION
       // ==========================================
 
@@ -586,6 +718,7 @@ const useWorkoutStore = create((set, get) => ({
               activeSession: data.activeSession || null,
               customExercises: data.customExercises || [],
               customTemplates: data.customTemplates || [],
+              bodyMeasurements: data.bodyMeasurements || [],
               stateVersion: data.version || 1,
               lastModified: data.lastModified || null,
               isStale: false,
@@ -598,6 +731,7 @@ const useWorkoutStore = create((set, get) => ({
               sessions: (data.sessions || []).length,
               customExercises: (data.customExercises || []).length,
               customTemplates: (data.customTemplates || []).length,
+              bodyMeasurements: (data.bodyMeasurements || []).length,
             });
             return { success: true };
           } else {
@@ -607,6 +741,7 @@ const useWorkoutStore = create((set, get) => ({
               activeSession: null,
               customExercises: [],
               customTemplates: [],
+              bodyMeasurements: [],
               stateVersion: 1,
               lastModified: null,
               isStale: false,
@@ -632,6 +767,7 @@ const useWorkoutStore = create((set, get) => ({
           activeSession: null,
           customExercises: [],
           customTemplates: [],
+          bodyMeasurements: [],
         });
       },
     }));

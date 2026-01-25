@@ -672,7 +672,7 @@ export default function ExerciseLogger({
                                 value={editingSetData.weight}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
+                                  const val = parseFloat(String(e.target.value).replace(',', '.')) || 0;
                                   if (val >= 0 && val <= 500) {
                                     setEditingSetData({ ...editingSetData, weight: val });
                                   }
@@ -862,7 +862,7 @@ export default function ExerciseLogger({
                           value={currentSet.weight}
                           onFocus={(e) => e.target.select()}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
+                            const val = parseFloat(String(e.target.value).replace(',', '.')) || 0;
                             if (val >= 0 && val <= 500) {
                               setCurrentSet({ ...currentSet, weight: val });
                             }

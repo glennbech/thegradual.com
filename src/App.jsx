@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy, Activity, Pencil } from 'lucide-react'
+import { Home, Calendar, Dumbbell, Plus, User, Cloud, CloudOff, TrendingUp, Check, RefreshCw, Copy, Activity, Pencil, Scale } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { pageTransition } from './utils/animations'
 import SessionPlanner from './components/SessionPlanner'
@@ -9,6 +9,7 @@ import SessionContainer from './components/SessionContainer'
 import SessionHistory from './components/SessionHistory'
 import Profile from './components/Profile'
 import Analyze from './components/Analyze'
+import Body from './components/Body'
 import TransferConfirmation from './components/TransferConfirmation'
 import AuthButton from './components/AuthButton'
 import WelcomeOnboardingModal from './components/WelcomeOnboardingModal'
@@ -35,7 +36,7 @@ function AppContent() {
   // Parse initial view from URL pathname
   const getInitialView = () => {
     const path = window.location.pathname.replace(/^\//, '') || 'home'
-    const validViews = ['home', 'plan', 'history', 'analyze', 'profile', 'logger']
+    const validViews = ['home', 'plan', 'history', 'analyze', 'body', 'profile', 'logger']
     return validViews.includes(path) ? path : 'home'
   }
 
@@ -86,7 +87,7 @@ function AppContent() {
     // Handle browser back/forward buttons
     const handlePopState = (event) => {
       const path = window.location.pathname.replace(/^\//, '') || 'home'
-      const validViews = ['home', 'plan', 'history', 'analyze', 'profile', 'logger']
+      const validViews = ['home', 'plan', 'history', 'analyze', 'body', 'profile', 'logger']
       const view = validViews.includes(path) ? path : 'home'
       setCurrentView(view)
     }
@@ -186,6 +187,7 @@ function AppContent() {
     { id: 'plan', label: 'Plan', icon: Pencil },
     { id: 'history', label: 'History', icon: Calendar },
     { id: 'analyze', label: 'Analyze', icon: Activity },
+    { id: 'body', label: 'Body', icon: Scale },
     { id: 'profile', label: 'Profile', icon: User },
   ]
 
@@ -323,6 +325,10 @@ function AppContent() {
                 <Analyze />
               )}
 
+              {currentView === 'body' && (
+                <Body />
+              )}
+
               {currentView === 'profile' && (
                 <Profile />
               )}
@@ -337,8 +343,8 @@ function AppContent() {
         animate={{ y: 0 }}
         className="fixed bottom-0 left-0 right-0 bg-white border-t border-mono-200 z-40"
       >
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-around py-3">
+        <div className="container mx-auto px-1 sm:px-4">
+          <div className="flex items-center justify-between py-3">
             {navItems.map((item) => {
               const Icon = item.icon
               const isActive = currentView === item.id
@@ -352,14 +358,14 @@ function AppContent() {
                     window.history.pushState({ view: item.id }, '', path)
                   }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex flex-col items-center gap-1 px-4 py-2 transition-all border-b-2 ${
+                  className={`flex flex-col items-center gap-0.5 sm:gap-1 px-1 sm:px-3 py-2 transition-all border-b-2 flex-1 ${
                     isActive
                       ? 'border-mono-900 text-mono-900'
                       : 'border-transparent text-mono-500 hover:text-mono-700'
                   }`}
                 >
-                  <Icon className="w-4 h-4" strokeWidth={2} />
-                  <span className="text-xs font-medium uppercase tracking-wide">{item.label}</span>
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2} />
+                  <span className="text-[9px] sm:text-xs font-medium uppercase tracking-wide whitespace-nowrap">{item.label}</span>
                 </motion.button>
               )
             })}

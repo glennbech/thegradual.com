@@ -290,8 +290,9 @@ export default function SessionDetailSheet({
                                       <>
                                         <span className="text-sm text-mono-500">×</span>
                                         <input
-                                          type="number"
+                                          type="text"
                                           inputMode="decimal"
+                                          pattern="[0-9]*[.,]?[0-9]*"
                                           value={editingSet.weight}
                                           onChange={(e) => onSetFieldChange('weight', e.target.value, e)}
                                           onKeyDown={(e) => onKeyDown(e, session.id)}
@@ -299,9 +300,6 @@ export default function SessionDetailSheet({
                                           onClick={(e) => e.stopPropagation()}
                                           className="w-20 px-2 py-1 border-2 border-mono-900 text-lg font-bold text-center focus:outline-none focus:border-yellow-500 tabular-nums"
                                           placeholder="kg"
-                                          min="0"
-                                          max="500"
-                                          step="0.5"
                                         />
                                         <span className="text-sm text-mono-500">kg</span>
                                         <div className="flex gap-1 ml-2">
