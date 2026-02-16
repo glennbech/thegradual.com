@@ -625,6 +625,12 @@ export default function ExerciseLogger({
                   set.completed === false
                     ? 'border-2 border-mono-900'
                     : 'border border-mono-200'
+                } ${
+                  set.setType === 'warm-up'
+                    ? 'border-l-4 border-l-orange-500'
+                    : set.setType === 'drop'
+                    ? 'border-l-4 border-l-cyan-500'
+                    : ''
                 }`}
                   >
                     {editingExerciseIndex === exerciseIndex && editingSetIndex === setIndex && editingSetData ? (
@@ -781,7 +787,10 @@ export default function ExerciseLogger({
                           </p>
                           <div className="flex items-center gap-2 text-xs text-mono-500">
                             {set.setType !== 'working' && (
-                              <span className="uppercase">{set.setType}</span>
+                              <span className="flex items-center gap-1">
+                                <span>{set.setType === 'warm-up' ? '🔥' : '📉'}</span>
+                                <span className="uppercase">{set.setType}</span>
+                              </span>
                             )}
                             {set.completed && set.restDuration && (
                               <>

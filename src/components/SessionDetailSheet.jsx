@@ -248,6 +248,12 @@ export default function SessionDetailSheet({
                                     isEditingThisSet
                                       ? 'bg-yellow-50 border-2 border-yellow-400'
                                       : 'bg-mono-50 border border-mono-200 cursor-pointer hover:border-mono-400'
+                                  } ${
+                                    !isEditingThisSet && set.setType === 'warm-up'
+                                      ? 'border-l-4 border-l-orange-500'
+                                      : !isEditingThisSet && set.setType === 'drop'
+                                      ? 'border-l-4 border-l-cyan-500'
+                                      : ''
                                   }`}
                                   onClick={(e) => {
                                     e.stopPropagation();
