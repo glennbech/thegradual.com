@@ -54,6 +54,7 @@ type LoginResponse struct {
 
 // RefreshResponse to frontend
 type RefreshResponse struct {
+	IDToken     string                 `json:"id_token"`
 	AccessToken string                 `json:"access_token"`
 	ExpiresIn   int                    `json:"expires_in"`
 	User        map[string]interface{} `json:"user"`
@@ -371,8 +372,9 @@ func handleRefresh(w http.ResponseWriter, r *http.Request) {
 		setRefreshTokenCookie(w, tokens.RefreshToken)
 	}
 
-	// Send new access token to frontend
+	// Send new ID token and access token to frontend
 	response := RefreshResponse{
+		IDToken:     tokens.IDToken,
 		AccessToken: tokens.AccessToken,
 		ExpiresIn:   tokens.ExpiresIn,
 		User:        user,

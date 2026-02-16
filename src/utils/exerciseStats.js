@@ -8,7 +8,7 @@
  */
 const calculateTotalReps = (sets) => {
   return sets
-    .filter(set => set.completed && set.setType !== 'warm-up')
+    .filter(set => set.completed && set.setType === 'working')
     .reduce((sum, set) => sum + (set.reps || 0), 0);
 };
 
@@ -17,7 +17,7 @@ const calculateTotalReps = (sets) => {
  */
 const calculateTotalVolume = (sets) => {
   return sets
-    .filter(set => set.completed && set.setType !== 'warm-up')
+    .filter(set => set.completed && set.setType === 'working')
     .reduce((sum, set) => sum + ((set.reps || 0) * (set.weight || 0)), 0);
 };
 
@@ -25,7 +25,7 @@ const calculateTotalVolume = (sets) => {
  * Find max weight from a single set
  */
 const findMaxWeight = (sets) => {
-  const workingSets = sets.filter(set => set.completed && set.setType !== 'warm-up');
+  const workingSets = sets.filter(set => set.completed && set.setType === 'working');
   if (workingSets.length === 0) return 0;
   return Math.max(...workingSets.map(set => set.weight || 0));
 };

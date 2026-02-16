@@ -77,8 +77,6 @@ export default function SessionTimeline({ session }) {
         return '💪';
       case 'drop':
         return '📉';
-      case 'failure':
-        return '⚡';
       default:
         return '💪';
     }

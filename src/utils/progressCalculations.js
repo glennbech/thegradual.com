@@ -92,7 +92,7 @@ export function getExerciseStats(exerciseId, sessions, exerciseDefinition = null
       }
 
       const completedSets = exerciseInSession.sets
-        .filter(set => set.setType !== 'warm-up' && set.completed);
+        .filter(set => set.setType === 'working' && set.completed);
 
       // Skip sessions with no completed sets
       if (completedSets.length === 0) return;
@@ -248,7 +248,7 @@ export function getPersonalRecords(sessions, exercises) {
       if (!exercise.sets || exercise.sets.length === 0) return;
 
       const completedSets = exercise.sets
-        .filter(set => set.setType !== 'warm-up' && set.completed);
+        .filter(set => set.setType === 'working' && set.completed);
       const maxWeight = completedSets.length > 0
         ? Math.max(...completedSets.map(set => set.weight || 0))
         : 0;
@@ -297,8 +297,9 @@ export function getVolumeMilestones(sessions) {
       if (!exercise.sets || exercise.sets.length === 0) return;
 
       exercise.sets.forEach(set => {
-        // Only count completed sets
+        // Only count completed working sets
         if (!set.completed) return;
+        if (set.setType !== 'working') return;
 
         const setVolume = (set.reps || 0) * (set.weight || 0);
         totalVolume += setVolume;

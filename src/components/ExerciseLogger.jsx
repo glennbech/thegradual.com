@@ -290,17 +290,46 @@ export default function ExerciseLogger({
 
       const exerciseType = getExerciseType(exercise);
       if (exerciseType === 'time-based') {
-        return { ...baseSet, duration: currentSet.duration };
+        const duration = typeof currentSet.duration === 'string'
+          ? parseInt(currentSet.duration) || 0
+          : currentSet.duration;
+        return { ...baseSet, duration };
       } else if (exerciseType === 'reps-only') {
-        return { ...baseSet, reps: currentSet.reps };
+        const reps = typeof currentSet.reps === 'string'
+          ? parseInt(currentSet.reps) || 0
+          : currentSet.reps;
+        return { ...baseSet, reps };
       } else {
         // weight+reps (default)
-        return { ...baseSet, reps: currentSet.reps, weight: currentSet.weight };
+        const reps = typeof currentSet.reps === 'string'
+          ? parseInt(currentSet.reps) || 0
+          : currentSet.reps;
+        const weight = typeof currentSet.weight === 'string'
+          ? parseFloat(currentSet.weight.replace(',', '.')) || 0
+          : currentSet.weight;
+        return { ...baseSet, reps, weight };
       }
     })();
 
     const updatedExercises = [...activeSession.exercises];
-    updatedExercises[exerciseIndex].sets = [...exercise.sets, newSet];
+    const currentSets = [...exercise.sets];
+
+    // Smart ordering: warm-up at top, drop at bottom, working in middle
+    let insertIndex;
+    if (newSet.setType === 'warm-up') {
+      // Insert at position 0 (top)
+      insertIndex = 0;
+    } else if (newSet.setType === 'drop') {
+      // Append to end (bottom)
+      insertIndex = currentSets.length;
+    } else {
+      // Working set: insert after last warm-up, before first drop
+      const firstDropIndex = currentSets.findIndex(s => s.setType === 'drop');
+      insertIndex = firstDropIndex !== -1 ? firstDropIndex : currentSets.length;
+    }
+
+    currentSets.splice(insertIndex, 0, newSet);
+    updatedExercises[exerciseIndex].sets = currentSets;
 
     updateActiveSession({ exercises: updatedExercises });
 
@@ -357,7 +386,15 @@ export default function ExerciseLogger({
     if (!exercise) return;
 
     const updatedSets = [...exercise.sets];
-    updatedSets[editingSetIndex] = { ...editingSetData };
+    // Parse string values to numbers before saving
+    const setToSave = { ...editingSetData };
+    if (typeof setToSave.weight === 'string') {
+      setToSave.weight = parseFloat(setToSave.weight.replace(',', '.')) || 0;
+    }
+    if (typeof setToSave.reps === 'string') {
+      setToSave.reps = parseInt(setToSave.reps) || 0;
+    }
+    updatedSets[editingSetIndex] = setToSave;
 
     const updatedExercises = [...activeSession.exercises];
     updatedExercises[editingExerciseIndex].sets = updatedSets;
@@ -474,7 +511,6 @@ export default function ExerciseLogger({
     { value: 'warm-up', label: 'Warm-up', icon: '🔥' },
     { value: 'working', label: 'Working', icon: '💪' },
     { value: 'drop', label: 'Drop', icon: '📉' },
-    { value: 'failure', label: 'Failure', icon: '⚡' },
   ];
 
   const selectedSetTypeLabel = setTypeOptions.find((opt) => opt.value === setType)?.label || 'Working';
@@ -644,9 +680,13 @@ export default function ExerciseLogger({
                               value={editingSetData.reps}
                               onFocus={(e) => e.target.select()}
                               onChange={(e) => {
-                                const val = parseInt(e.target.value) || 0;
-                                if (val >= 0 && val <= 100) {
-                                  setEditingSetData({ ...editingSetData, reps: val });
+                                const inputValue = e.target.value;
+                                // Allow empty and numbers only
+                                if (inputValue === '' || /^[0-9]*$/.test(inputValue)) {
+                                  const numValue = parseInt(inputValue);
+                                  if (inputValue === '' || isNaN(numValue) || (numValue >= 0 && numValue <= 100)) {
+                                    setEditingSetData({ ...editingSetData, reps: inputValue });
+                                  }
                                 }
                               }}
                               onKeyDown={(e) => {
@@ -672,9 +712,15 @@ export default function ExerciseLogger({
                                 value={editingSetData.weight}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
-                                  const val = parseFloat(String(e.target.value).replace(',', '.')) || 0;
-                                  if (val >= 0 && val <= 500) {
-                                    setEditingSetData({ ...editingSetData, weight: val });
+                                  const inputValue = e.target.value;
+                                  // Allow empty, numbers, and decimal separators (. or ,)
+                                  if (inputValue === '' || /^[0-9]*[.,]?[0-9]*$/.test(inputValue)) {
+                                    // Check if it's a valid number for validation (but keep as string)
+                                    const normalizedValue = inputValue.replace(',', '.');
+                                    const numValue = parseFloat(normalizedValue);
+                                    if (inputValue === '' || isNaN(numValue) || (numValue >= 0 && numValue <= 500)) {
+                                      setEditingSetData({ ...editingSetData, weight: inputValue });
+                                    }
                                   }
                                 }}
                                 onKeyDown={(e) => {
@@ -812,6 +858,28 @@ export default function ExerciseLogger({
                   </motion.button>
                 </div>
 
+              {/* Set Type Selector */}
+              <div className="flex flex-col gap-2">
+                <label className={headingStyles.label}>Set Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {setTypeOptions.map((option) => (
+                    <motion.button
+                      key={option.value}
+                      onClick={() => setSetType(option.value)}
+                      whileTap={{ scale: 0.95 }}
+                      className={`py-3 px-4 border-2 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-colors ${
+                        setType === option.value
+                          ? 'bg-mono-900 text-white border-mono-900'
+                          : 'bg-white text-mono-600 border-mono-300 hover:border-mono-900'
+                      }`}
+                    >
+                      <span className="text-lg">{option.icon}</span>
+                      <span>{option.label}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
               {/* Input fields - conditional based on exercise type */}
               <div className={`grid ${getExerciseType(exercise) === 'time-based' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
                 {getExerciseType(exercise) === 'time-based' ? (
@@ -843,9 +911,13 @@ export default function ExerciseLogger({
                         value={currentSet.reps}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          if (val >= 0 && val <= 100) {
-                            setCurrentSet({ ...currentSet, reps: val });
+                          const inputValue = e.target.value;
+                          // Allow empty and numbers only
+                          if (inputValue === '' || /^[0-9]*$/.test(inputValue)) {
+                            const numValue = parseInt(inputValue);
+                            if (inputValue === '' || isNaN(numValue) || (numValue >= 0 && numValue <= 100)) {
+                              setCurrentSet({ ...currentSet, reps: inputValue });
+                            }
                           }
                         }}
                         className="h-14 px-4 border-2 border-mono-900 bg-white text-mono-900 text-xl font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"
@@ -862,9 +934,15 @@ export default function ExerciseLogger({
                           value={currentSet.weight}
                           onFocus={(e) => e.target.select()}
                           onChange={(e) => {
-                            const val = parseFloat(String(e.target.value).replace(',', '.')) || 0;
-                            if (val >= 0 && val <= 500) {
-                              setCurrentSet({ ...currentSet, weight: val });
+                            const inputValue = e.target.value;
+                            // Allow empty, numbers, and decimal separators (. or ,)
+                            if (inputValue === '' || /^[0-9]*[.,]?[0-9]*$/.test(inputValue)) {
+                              // Check if it's a valid number for validation (but keep as string)
+                              const normalizedValue = inputValue.replace(',', '.');
+                              const numValue = parseFloat(normalizedValue);
+                              if (inputValue === '' || isNaN(numValue) || (numValue >= 0 && numValue <= 500)) {
+                                setCurrentSet({ ...currentSet, weight: inputValue });
+                              }
                             }
                           }}
                           className="h-14 px-4 border-2 border-mono-900 bg-white text-mono-900 text-xl font-bold text-center tabular-nums focus:border-mono-900 focus:outline-none focus:ring-2 focus:ring-mono-900"

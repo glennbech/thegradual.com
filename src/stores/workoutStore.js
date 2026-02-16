@@ -19,6 +19,7 @@ const useWorkoutStore = create((set, get) => ({
       customExercises: [],
       customTemplates: [],
       bodyMeasurements: [],
+      restTimerDuration: 120, // Rest timer in seconds (default 2 minutes)
       isOnline: navigator.onLine,
       isLoading: false, // Track loading state for API operations
 
@@ -681,6 +682,54 @@ const useWorkoutStore = create((set, get) => ({
       },
 
       // ==========================================
+      // SETTINGS ACTIONS
+      // ==========================================
+
+      /**
+       * Update rest timer duration (in seconds)
+       * API-FIRST: Saves to DynamoDB before updating local state
+       */
+      setRestTimerDuration: async (duration) => {
+        const { isOnline } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot update settings while offline');
+        }
+
+        // Validate duration (60s to 300s / 1-5 minutes)
+        const validDuration = Math.max(60, Math.min(300, duration));
+
+        set({ isLoading: true });
+
+        try {
+          const state = get();
+          await state._saveWithVersion({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+            bodyMeasurements: state.bodyMeasurements,
+            restTimerDuration: validDuration,
+          });
+
+          set({ restTimerDuration: validDuration, isLoading: false });
+          console.log('[workoutStore] Rest timer duration updated:', validDuration);
+          return validDuration;
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to update rest timer duration:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Get rest timer duration
+       */
+      getRestTimerDuration: () => {
+        return get().restTimerDuration;
+      },
+
+      // ==========================================
       // DATA LOADING & CONNECTION
       // ==========================================
 
@@ -719,6 +768,7 @@ const useWorkoutStore = create((set, get) => ({
               customExercises: data.customExercises || [],
               customTemplates: data.customTemplates || [],
               bodyMeasurements: data.bodyMeasurements || [],
+              restTimerDuration: data.restTimerDuration || 120,
               stateVersion: data.version || 1,
               lastModified: data.lastModified || null,
               isStale: false,
@@ -742,6 +792,7 @@ const useWorkoutStore = create((set, get) => ({
               customExercises: [],
               customTemplates: [],
               bodyMeasurements: [],
+              restTimerDuration: 120,
               stateVersion: 1,
               lastModified: null,
               isStale: false,

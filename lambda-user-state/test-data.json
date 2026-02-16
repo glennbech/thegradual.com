@@ -147,5 +147,46 @@
       }
     ]
   },
+  "bodyMeasurements": [
+    {
+      "id": "measurement-1734048000000",
+      "date": "2024-12-15T08:00:00Z",
+      "weight": 75.5,
+      "bodyFatPercentage": 18.2,
+      "waist": 80,
+      "chest": 100,
+      "hips": 95,
+      "arms": 35,
+      "thighs": 58,
+      "calves": 38,
+      "notes": "Morning measurement, fasted"
+    },
+    {
+      "id": "measurement-1733616000000",
+      "date": "2024-12-08T08:00:00Z",
+      "weight": 76.2,
+      "bodyFatPercentage": 18.8,
+      "waist": 81,
+      "chest": 99,
+      "hips": 95,
+      "arms": 34.5,
+      "thighs": 57.5,
+      "calves": 37.5,
+      "notes": "After weekend, slight increase"
+    },
+    {
+      "id": "measurement-1733011200000",
+      "date": "2024-12-01T08:00:00Z",
+      "weight": 76.8,
+      "bodyFatPercentage": 19.1,
+      "waist": 82,
+      "chest": 98.5,
+      "hips": 94.5,
+      "arms": 34,
+      "thighs": 57,
+      "calves": 37.5,
+      "notes": "Starting point"
+    }
+  ],
   "lastUpdated": "2024-11-15T19:05:00Z"
 }

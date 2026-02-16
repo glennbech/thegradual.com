@@ -24,26 +24,28 @@ var (
 // UserState represents the complete gym app state for a user
 // Note: DynamoDB may have binary OR string data (migration from old format)
 type UserState struct {
-	UUID             string `json:"uuid" dynamodbav:"uuid"`
-	Version          int64  `json:"version" dynamodbav:"version"`
-	LastModified     string `json:"lastModified" dynamodbav:"lastModified"`
-	Sessions         string `json:"sessions,omitempty" dynamodbav:"sessions,omitempty"`
-	CustomExercises  string `json:"customExercises,omitempty" dynamodbav:"customExercises,omitempty"`
-	CustomTemplates  string `json:"customTemplates,omitempty" dynamodbav:"customTemplates,omitempty"`
-	ActiveSession    string `json:"activeSession,omitempty" dynamodbav:"activeSession,omitempty"`
-	LastUpdated      string `json:"lastUpdated,omitempty" dynamodbav:"lastUpdated,omitempty"`
+	UUID              string `json:"uuid" dynamodbav:"uuid"`
+	Version           int64  `json:"version" dynamodbav:"version"`
+	LastModified      string `json:"lastModified" dynamodbav:"lastModified"`
+	Sessions          string `json:"sessions,omitempty" dynamodbav:"sessions,omitempty"`
+	CustomExercises   string `json:"customExercises,omitempty" dynamodbav:"customExercises,omitempty"`
+	CustomTemplates   string `json:"customTemplates,omitempty" dynamodbav:"customTemplates,omitempty"`
+	ActiveSession     string `json:"activeSession,omitempty" dynamodbav:"activeSession,omitempty"`
+	BodyMeasurements  string `json:"bodyMeasurements,omitempty" dynamodbav:"bodyMeasurements,omitempty"`
+	LastUpdated       string `json:"lastUpdated,omitempty" dynamodbav:"lastUpdated,omitempty"`
 }
 
 // DynamoUserState handles both binary and string formats from DynamoDB
 type DynamoUserState struct {
-	UUID             string      `dynamodbav:"uuid"`
-	Version          int64       `dynamodbav:"version"`
-	LastModified     string      `dynamodbav:"lastModified"`
-	Sessions         interface{} `dynamodbav:"sessions,omitempty"`
-	CustomExercises  interface{} `dynamodbav:"customExercises,omitempty"`
-	CustomTemplates  interface{} `dynamodbav:"customTemplates,omitempty"`
-	ActiveSession    interface{} `dynamodbav:"activeSession,omitempty"`
-	LastUpdated      string      `dynamodbav:"lastUpdated,omitempty"`
+	UUID              string      `dynamodbav:"uuid"`
+	Version           int64       `dynamodbav:"version"`
+	LastModified      string      `dynamodbav:"lastModified"`
+	Sessions          interface{} `dynamodbav:"sessions,omitempty"`
+	CustomExercises   interface{} `dynamodbav:"customExercises,omitempty"`
+	CustomTemplates   interface{} `dynamodbav:"customTemplates,omitempty"`
+	ActiveSession     interface{} `dynamodbav:"activeSession,omitempty"`
+	BodyMeasurements  interface{} `dynamodbav:"bodyMeasurements,omitempty"`
+	LastUpdated       string      `dynamodbav:"lastUpdated,omitempty"`
 }
 
 // init runs once on Lambda cold start
@@ -144,14 +146,15 @@ func handleGetState(ctx context.Context, uuid string, headers map[string]string)
 	// If no item found, return empty state with full structure
 	if result.Item == nil {
 		emptyState := UserState{
-			UUID:            uuid,
-			Version:         1,
-			LastModified:    "",
-			Sessions:        "[]",
-			CustomExercises: "[]",
-			CustomTemplates: "[]",
-			ActiveSession:   "null",
-			LastUpdated:     "",
+			UUID:             uuid,
+			Version:          1,
+			LastModified:     "",
+			Sessions:         "[]",
+			CustomExercises:  "[]",
+			CustomTemplates:  "[]",
+			ActiveSession:    "null",
+			BodyMeasurements: "[]",
+			LastUpdated:      "",
 		}
 		body, _ := json.Marshal(emptyState)
 		return events.APIGatewayProxyResponse{
@@ -171,14 +174,15 @@ func handleGetState(ctx context.Context, uuid string, headers map[string]string)
 
 	// Convert to UserState with string fields (handles both binary and string)
 	state := UserState{
-		UUID:            dynamoState.UUID,
-		Version:         dynamoState.Version,
-		LastModified:    dynamoState.LastModified,
-		Sessions:        convertToString(dynamoState.Sessions),
-		CustomExercises: convertToString(dynamoState.CustomExercises),
-		CustomTemplates: convertToString(dynamoState.CustomTemplates),
-		ActiveSession:   convertToString(dynamoState.ActiveSession),
-		LastUpdated:     dynamoState.LastUpdated,
+		UUID:             dynamoState.UUID,
+		Version:          dynamoState.Version,
+		LastModified:     dynamoState.LastModified,
+		Sessions:         convertToString(dynamoState.Sessions),
+		CustomExercises:  convertToString(dynamoState.CustomExercises),
+		CustomTemplates:  convertToString(dynamoState.CustomTemplates),
+		ActiveSession:    convertToString(dynamoState.ActiveSession),
+		BodyMeasurements: convertToString(dynamoState.BodyMeasurements),
+		LastUpdated:      dynamoState.LastUpdated,
 	}
 
 	// Migrate old records: if version is 0, set to 1
@@ -352,12 +356,13 @@ func handleDebugState(ctx context.Context, uuid string, headers map[string]strin
 
 	// Convert to UserState with string fields
 	state := UserState{
-		UUID:            dynamoState.UUID,
-		Sessions:        convertToString(dynamoState.Sessions),
-		CustomExercises: convertToString(dynamoState.CustomExercises),
-		CustomTemplates: convertToString(dynamoState.CustomTemplates),
-		ActiveSession:   convertToString(dynamoState.ActiveSession),
-		LastUpdated:     dynamoState.LastUpdated,
+		UUID:             dynamoState.UUID,
+		Sessions:         convertToString(dynamoState.Sessions),
+		CustomExercises:  convertToString(dynamoState.CustomExercises),
+		CustomTemplates:  convertToString(dynamoState.CustomTemplates),
+		ActiveSession:    convertToString(dynamoState.ActiveSession),
+		BodyMeasurements: convertToString(dynamoState.BodyMeasurements),
+		LastUpdated:      dynamoState.LastUpdated,
 	}
 
 	return formatDebugHTML(state, uuid)

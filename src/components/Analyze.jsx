@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Trophy } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import useWorkoutStore from '../stores/workoutStore';
 import { getMuscleColor } from '../utils/design-system';
 import {
@@ -13,24 +13,33 @@ import {
 import {
   getPerformedExercises,
   getExerciseStats,
-  calculateTrend,
-  getPersonalRecords
+  calculateTrend
 } from '../utils/progressCalculations';
 import StrengthChart from './StrengthChart';
 import ExerciseProgressCard from './ExerciseProgressCard';
 import ExerciseProgressDetail from './ExerciseProgressDetail';
-import Achievements from './Achievements';
 import { pageTransition, staggerContainer, staggerItem } from '../utils/animations';
 import defaultExercises from '../data/exercises.json';
 
 /**
  * Analyze component - Scientific strength metrics and analytics
  */
-export default function Analyze() {
+export default function Analyze({ onNavigateToSession }) {
   const { sessions } = useWorkoutStore();
   const [expandedExerciseId, setExpandedExerciseId] = useState(null);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [selectedStats, setSelectedStats] = useState(null);
+
+  // Handle session click - navigate to history with selected session
+  const handleSessionClick = (sessionId) => {
+    console.log('[Analyze] handleSessionClick called with sessionId:', sessionId);
+    if (onNavigateToSession) {
+      console.log('[Analyze] Calling onNavigateToSession with:', sessionId);
+      onNavigateToSession(sessionId);
+    } else {
+      console.warn('[Analyze] onNavigateToSession callback is not defined');
+    }
+  };
 
   // Get custom exercises from store
   const customExercises = useWorkoutStore((state) => state.getCustomExercises());
@@ -69,13 +78,6 @@ export default function Analyze() {
     // Sort by latest e1RM descending
     return analytics.sort((a, b) => b.latest.e1rm - a.latest.e1rm);
   }, [sessions, exercisesWithStandards]);
-
-  // Calculate personal records
-  const personalRecords = useMemo(() => {
-    if (!sessions || sessions.length === 0) return [];
-    const completedSessions = sessions.filter(s => s.status === 'completed');
-    return getPersonalRecords(completedSessions, exercises);
-  }, [sessions, exercises]);
 
   // Get exercises that have been performed (for exercise progress cards)
   const performedExercises = useMemo(() => {
@@ -340,14 +342,7 @@ export default function Analyze() {
         </p>
       </div>
 
-      {/* Personal Records Section */}
-      {personalRecords.length > 0 && (
-        <motion.section variants={staggerContainer} initial="initial" animate="animate">
-          <Achievements personalRecords={personalRecords} />
-        </motion.section>
-      )}
-
-      {/* 2. Exercise Progress Section */}
+      {/* Exercise Progress Section */}
       {performedExercises.length > 0 && (
         <motion.section variants={staggerContainer} initial="initial" animate="animate">
           <div className="flex items-center gap-3 mb-4">
@@ -446,6 +441,7 @@ export default function Analyze() {
           stats={selectedStats}
           isOpen={!!selectedExercise}
           onClose={handleCloseDetail}
+          onSessionClick={handleSessionClick}
         />
       )}
     </motion.div>

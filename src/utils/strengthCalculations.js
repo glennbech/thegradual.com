@@ -56,8 +56,8 @@ export function getBestE1RM(sets) {
   let bestAverage = 0;
 
   sets.forEach(set => {
-    // Skip warm-up sets and incomplete sets
-    if (set.setType === 'warm-up') return;
+    // Only count working sets that are completed
+    if (set.setType !== 'working') return;
     if (!set.completed) return;
 
     const e1rm = calculateE1RM(set.weight, set.reps);
@@ -339,7 +339,7 @@ export function getVolumeForDay(sessions, date) {
 
     session.exercises?.forEach(exercise => {
       exercise.sets?.forEach(set => {
-        if (set.setType !== 'warm-up' && set.completed) {
+        if (set.setType === 'working' && set.completed) {
           totalVolume += (set.reps || 0) * (set.weight || 0);
         }
       });

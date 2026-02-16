@@ -261,10 +261,18 @@ export default function SessionDetailSheet({
                                       {setIndex + 1}
                                     </div>
 
+                                    {/* Set Type Badge */}
+                                    {set.setType && set.setType !== 'working' && (
+                                      <span className="text-sm">
+                                        {set.setType === 'warm-up' && '🔥'}
+                                        {set.setType === 'drop' && '📉'}
+                                      </span>
+                                    )}
+
                                     {isEditingThisSet ? (
                                       <div className="flex items-center gap-2">
                                         <input
-                                          type="number"
+                                          type="text"
                                           inputMode="numeric"
                                           value={editingSet.reps}
                                           onChange={(e) => onSetFieldChange('reps', e.target.value, e)}
@@ -273,8 +281,6 @@ export default function SessionDetailSheet({
                                           onClick={(e) => e.stopPropagation()}
                                           className="w-16 px-2 py-1 border-2 border-mono-900 text-sm font-semibold text-center focus:outline-none focus:border-yellow-500"
                                           placeholder="Reps"
-                                          min="0"
-                                          max="100"
                                         />
                                         <span className="text-xs text-mono-500">reps</span>
                                       </div>

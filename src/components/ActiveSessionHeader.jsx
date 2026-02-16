@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Clock, Trash2 } from 'lucide-react';
+import { Dumbbell, Clock, Trash2, Plus, Minus, SkipForward } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import useWorkoutStore from '../stores/workoutStore';
 import { formatDuration } from '../utils/design-system';
@@ -8,11 +8,12 @@ import ConfirmDialog from './ConfirmDialog';
 
 export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, currentView }) {
   const activeSession = useWorkoutStore((state) => state.activeSession);
+  const restTimerDuration = useWorkoutStore((state) => state.restTimerDuration);
 
   // Timer state
   const [exerciseStartTime, setExerciseStartTime] = useState(Date.now());
   const [exerciseTime, setExerciseTime] = useState(0);
-  const [restTimeRemaining, setRestTimeRemaining] = useState(90);
+  const [restTimeRemaining, setRestTimeRemaining] = useState(restTimerDuration);
   const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession);
 
   // Discard confirmation dialog
@@ -20,6 +21,32 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
 
   const currentExerciseIndex = activeSession?.currentExerciseIndex || 0;
   const isOnLoggerView = currentView === 'logger';
+
+  // Rest timer adjustment functions
+  const adjustRestTime = (seconds) => {
+    if (!activeSession?.isResting || !activeSession?.restStartTime) return;
+
+    // To add time: move restStartTime backward (subtract milliseconds)
+    // To subtract time: move restStartTime forward (add milliseconds)
+    // Positive seconds = add time to timer (move start back)
+    // Negative seconds = subtract time from timer (move start forward)
+    const newRestStartTime = activeSession.restStartTime + (seconds * 1000);
+
+    updateActiveSession({
+      restStartTime: newRestStartTime
+    });
+  };
+
+  const skipRest = () => {
+    if (!activeSession?.isResting) return;
+
+    // Set restStartTime to a time in the past so remaining becomes 0
+    const newRestStartTime = Date.now() - (restTimerDuration * 1000);
+
+    updateActiveSession({
+      restStartTime: newRestStartTime
+    });
+  };
 
   // Exercise timer - tracks time since exercise started
   useEffect(() => {
@@ -37,7 +64,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
 
     const updateRestTimer = () => {
       const elapsed = Math.floor((Date.now() - activeSession.restStartTime) / 1000);
-      const remaining = Math.max(0, 90 - elapsed);
+      const remaining = Math.max(0, restTimerDuration - elapsed);
 
       setRestTimeRemaining(remaining);
 
@@ -65,7 +92,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
     // Update every second
     const interval = setInterval(updateRestTimer, 1000);
     return () => clearInterval(interval);
-  }, [activeSession?.isResting, activeSession?.restStartTime, activeSession, updateActiveSession]);
+  }, [activeSession?.isResting, activeSession?.restStartTime, activeSession, updateActiveSession, restTimerDuration]);
 
   // Reset exercise timer when changing exercises
   useEffect(() => {
@@ -103,6 +130,11 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
   const currentExercise = activeSession.exercises[currentExerciseIndex];
 
   const isResting = activeSession.isResting || false;
+
+  // Calculate completed exercises (all sets completed)
+  const completedExercises = activeSession.exercises.filter(exercise =>
+    exercise.sets.length > 0 && exercise.sets.every(set => set.completed)
+  ).length;
 
   // Safely calculate total workout duration
   // startTime should be in milliseconds, but guard against seconds (Unix timestamp)
@@ -154,37 +186,67 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.8, opacity: 0, y: 10 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-center gap-4 mb-6"
+                className="mb-6"
               >
-                <motion.div
-                  animate={{
-                    rotate: [0, -15, 15, -15, 15, 0],
-                    scale: [1, 1.1, 1, 1.1, 1]
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  <Clock className="w-10 h-10 text-pink-400" strokeWidth={2.5} />
-                </motion.div>
-                <div className="flex-1">
-                  <div className="text-xs text-pink-300 uppercase tracking-widest mb-1 font-bold">Rest</div>
+                <div className="flex items-center gap-4 mb-3">
                   <motion.div
-                    className="text-5xl font-black text-pink-400 tabular-nums leading-none"
                     animate={{
-                      scale: restTimeRemaining <= 10 ? [1, 1.1, 1] : 1,
-                      color: restTimeRemaining <= 10 ? ['#f9a8d4', '#ec4899', '#f9a8d4'] : '#f9a8d4'
+                      rotate: [0, -15, 15, -15, 15, 0],
+                      scale: [1, 1.1, 1, 1.1, 1]
                     }}
                     transition={{
-                      duration: 0.6,
-                      repeat: restTimeRemaining <= 10 ? Infinity : 0,
+                      duration: 1.5,
+                      repeat: Infinity,
                       ease: "easeInOut"
                     }}
                   >
-                    {Math.floor(restTimeRemaining / 60)}:{String(restTimeRemaining % 60).padStart(2, '0')}
+                    <Clock className="w-10 h-10 text-pink-400" strokeWidth={2.5} />
                   </motion.div>
+                  <div className="flex-1">
+                    <div className="text-xs text-pink-300 uppercase tracking-widest mb-1 font-bold">Rest</div>
+                    <motion.div
+                      className="text-5xl font-black text-pink-400 tabular-nums leading-none"
+                      animate={{
+                        scale: restTimeRemaining <= 10 ? [1, 1.1, 1] : 1,
+                        color: restTimeRemaining <= 10 ? ['#f9a8d4', '#ec4899', '#f9a8d4'] : '#f9a8d4'
+                      }}
+                      transition={{
+                        duration: 0.6,
+                        repeat: restTimeRemaining <= 10 ? Infinity : 0,
+                        ease: "easeInOut"
+                      }}
+                    >
+                      {Math.floor(restTimeRemaining / 60)}:{String(restTimeRemaining % 60).padStart(2, '0')}
+                    </motion.div>
+                  </div>
+                </div>
+
+                {/* Rest Timer Controls */}
+                <div className="flex gap-2">
+                  <motion.button
+                    onClick={() => adjustRestTime(15)}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex-1 bg-pink-400/20 border border-pink-400/40 text-pink-300 py-2 px-3 font-bold text-sm uppercase tracking-wide hover:bg-pink-400/30 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Minus className="w-4 h-4" strokeWidth={3} />
+                    <span>15s</span>
+                  </motion.button>
+                  <motion.button
+                    onClick={skipRest}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex-1 bg-white/20 border border-white/40 text-white py-2 px-3 font-bold text-sm uppercase tracking-wide hover:bg-white/30 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <SkipForward className="w-4 h-4" strokeWidth={3} />
+                    <span>Skip</span>
+                  </motion.button>
+                  <motion.button
+                    onClick={() => adjustRestTime(-15)}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex-1 bg-pink-400/20 border border-pink-400/40 text-pink-300 py-2 px-3 font-bold text-sm uppercase tracking-wide hover:bg-pink-400/30 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" strokeWidth={3} />
+                    <span>15s</span>
+                  </motion.button>
                 </div>
               </motion.div>
             ) : (
@@ -212,13 +274,13 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
             <div className="flex items-center gap-2">
               <Dumbbell className="w-4 h-4" strokeWidth={2.5} />
               <span className="text-sm font-medium">
-                Exercise {currentExerciseIndex + 1}/{activeSession.exercises.length}
+                {completedExercises}/{activeSession.exercises.length} completed
               </span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4" strokeWidth={2.5} />
               <span className="text-sm font-medium">
-                {Math.floor(totalExerciseTime / 60)}m total
+                {formatDuration(totalExerciseTime)} total
               </span>
             </div>
           </div>

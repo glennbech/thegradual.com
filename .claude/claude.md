@@ -128,6 +128,111 @@ src/
     └── animations.js
 ```
 
+## Component & Page Map
+
+> **Quick reference for finding the right file when working on specific features**
+
+### Main Pages (Routes)
+
+| Route | Component | Functional Area | Description |
+|-------|-----------|----------------|-------------|
+| `/` (home) | `SessionPlanner.jsx` | **Session Start** | Browse & start workouts, view templates |
+| `/plan` | `Plan.jsx` | **Exercise Planning** | Browse exercises, create custom workouts |
+| `/logger` | `SessionContainer.jsx` → `ExerciseLogger.jsx` | **Active Session** | Log sets during workout, timer controls |
+| `/history` | `SessionHistory.jsx` | **Session History** | View past workouts, calendar, stats |
+| `/analyze` | `Analyze.jsx` | **Progress Analytics** | Exercise progress, 1RM estimates, PRs |
+| `/body` | `Body.jsx` | **Body Measurements** | Track weight, body composition |
+| `/profile` | `Profile.jsx` | **User Profile** | Auth, cloud sync, data export |
+
+### Supporting Components by Functional Area
+
+#### 🏋️ Session Management & Logging
+- `ActiveSessionHeader.jsx` - **Timer controls, rest timer, exercise/rest modes** (sticky header)
+- `ExerciseLogger.jsx` - **Set-by-set logging, checkboxes, add sets**
+- `SessionContainer.jsx` - **Session wrapper, navigation between exercises**
+- `ExerciseVictoryScreen.jsx` - **Celebration screen after completing exercise**
+
+#### 📊 Progress & Analytics
+- `ExerciseProgressCard.jsx` - **Exercise progress cards** (Analyze page)
+- `ExerciseProgressDetail.jsx` - **Detailed exercise progress modal** (full history, charts)
+- `StrengthChart.jsx` - **1RM progression charts** (Analyze page)
+- `VolumeHeatmap.jsx` - **Volume heatmap visualization**
+- `MuscleGroupVolumeChart.jsx` - **Muscle group volume charts**
+- `WeeklyHeatmap.jsx` - **Weekly workout frequency heatmap**
+- `Progress.jsx` - **Generic progress component**
+
+#### 📅 History & Calendar
+- `SessionHistory.jsx` - **Main history page**
+- `SessionDetailSheet.jsx` - **Bottom sheet with session details** (swipe to dismiss)
+- `BubbleCalendar.jsx` - **Visual calendar with colored bubbles** for workout days
+- `WorkoutCalendar.jsx` - **Alternative calendar view**
+- `SessionTimeline.jsx` - **Session timeline visualization** (in detail sheet)
+
+#### 🎨 Templates & Planning
+- `SessionPlanner.jsx` - **Home page, template browser**
+- `Plan.jsx` - **Exercise browser, workout builder**
+- `WorkoutPreview.jsx` - **Modal showing template details** before starting
+- `QuickTemplateCard.jsx` - **Template card component** (home page)
+
+#### 🏃 Exercise Management
+- `ExerciseDetailModal.jsx` - **Exercise details modal** (info, instructions)
+- `AddExerciseModal.jsx` - **Add exercise to workout** (during planning)
+- `CreateExerciseCard.jsx` - **Create custom exercise card**
+
+#### 👤 Profile & Auth
+- `Profile.jsx` - **User profile, cloud sync status**
+- `AuthButton.jsx` - **Sign in/out button** (header)
+- `LandingPage.jsx` - **Landing page for unauthenticated users**
+- `WelcomeOnboardingModal.jsx` - **Onboarding for new users**
+
+#### 📏 Body Measurements
+- `Body.jsx` - **Body measurements page**
+- `AddMeasurementModal.jsx` - **Add/edit body measurement modal**
+
+#### 🔧 Shared Components & Modals
+- `ConfirmDialog.jsx` - **Generic confirmation dialog** (delete, discard)
+- `ConnectionLostModal.jsx` - **Offline warning modal** (blocks UI when offline)
+- `ConflictModal.jsx` - **Version conflict modal** (optimistic locking)
+- `TransferConfirmation.jsx` - **Transfer data from another device**
+- `FloatingSessionIndicator.jsx` - **Floating indicator for active session**
+- `ExerciseAddedToast.jsx` - **Toast notification** when exercise added
+
+### State Management
+
+| File | Area | Description |
+|------|------|-------------|
+| `stores/workoutStore.js` | **Global State** | Zustand store (sessions, exercises, templates, activeSession, timers) |
+| `contexts/AuthContext.jsx` | **Authentication** | Auth state, Cognito integration |
+| `hooks/useLocalStorage.js` | **Persistence** | LocalStorage hook (legacy, migrating to API) |
+
+### Services & Utils
+
+| File | Area | Description |
+|------|------|-------------|
+| `services/apiClient.js` | **API** | DynamoDB API client (GET/POST user state) |
+| `services/exerciseService.js` | **Exercises** | Exercise data management |
+| `services/stateService.js` | **State** | State persistence (legacy) |
+| `utils/animations.js` | **UI** | Framer Motion animation presets |
+| `utils/design-system.js` | **UI** | Design system utilities (colors, formatDuration) |
+| `utils/progressCalculations.js` | **Analytics** | Progress metrics, 1RM calculations |
+| `utils/userManager.js` | **Auth** | User UUID management |
+
+### Data Files
+
+| File | Purpose |
+|------|---------|
+| `data/exercises.json` | **70+ default exercises** (NEVER modify IDs!) |
+| `data/workoutTemplates.json` | **12+ default workout templates** |
+
+### Backend (Lambda + Go)
+
+| File | Purpose |
+|------|---------|
+| `lambda-bff/server.go` | **API Gateway handler** (routes, CORS) |
+| `lambda-user-state/main.go` | **DynamoDB handler** (GET/POST user state) |
+
+---
+
 ## Development
 
 **Commands:**

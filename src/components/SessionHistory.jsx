@@ -15,7 +15,7 @@ import {
   MoreHorizontal,
   Check,
 } from 'lucide-react';
-import { staggerContainer, staggerItem, scaleIn } from '../utils/animations';
+import { scaleIn } from '../utils/animations';
 import useWorkoutStore from '../stores/workoutStore';
 import { headingStyles, iconSizes } from '../utils/typography';
 import SessionTimeline from './SessionTimeline';
@@ -25,6 +25,8 @@ import SessionDetailSheet from './SessionDetailSheet';
 import { filterSessionsWithCompletedSets } from '../utils/progressCalculations';
 
 export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, onClearExpandedSession }) {
+  console.log('[SessionHistory] Component rendering. initialExpandedSessionId:', initialExpandedSessionId);
+
   // Zustand store - get raw sessions
   const rawSessions = useWorkoutStore((state) => state.sessions);
   const deleteSession = useWorkoutStore((state) => state.deleteSession);
@@ -59,16 +61,47 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
 
   // Auto-open the just-completed session in bottom sheet
   useEffect(() => {
-    if (initialExpandedSessionId && initialExpandedSessionId !== processedSessionIdRef.current) {
-      const session = sessions.find(s => s.id === initialExpandedSessionId);
-      if (session) {
+    console.log('[SessionHistory] useEffect triggered. initialExpandedSessionId:', initialExpandedSessionId, 'sessions.length:', sessions.length, 'processedRef:', processedSessionIdRef.current);
+
+    if (!initialExpandedSessionId) {
+      console.log('[SessionHistory] No initialExpandedSessionId provided');
+      return;
+    }
+
+    // Check if we've already processed this session ID
+    if (initialExpandedSessionId === processedSessionIdRef.current) {
+      console.log('[SessionHistory] Already processed this sessionId, skipping');
+      return;
+    }
+
+    // Wait for sessions to be available
+    if (sessions.length === 0) {
+      console.log('[SessionHistory] Sessions not loaded yet, waiting...');
+      return;
+    }
+
+    console.log('[SessionHistory] Looking for session with id:', initialExpandedSessionId);
+    console.log('[SessionHistory] Available session IDs:', sessions.map(s => s.id));
+
+    const session = sessions.find(s => s.id === initialExpandedSessionId);
+
+    if (session) {
+      console.log('[SessionHistory] Found session, opening bottom sheet:', session);
+      // Use setTimeout to ensure the component has fully rendered
+      setTimeout(() => {
         setSelectedSession(session);
         processedSessionIdRef.current = initialExpandedSessionId;
-        // Clear the flag immediately to prevent re-triggering
+
+        // Clear the expanded session ID from parent after opening
         if (onClearExpandedSession) {
-          onClearExpandedSession();
+          setTimeout(() => {
+            onClearExpandedSession();
+          }, 100);
         }
-      }
+      }, 50);
+    } else {
+      console.warn('[SessionHistory] Session not found:', initialExpandedSessionId);
+      console.warn('[SessionHistory] This might be because the session was filtered out or does not exist');
     }
   }, [initialExpandedSessionId, onClearExpandedSession, sessions]);
 
@@ -168,10 +201,18 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
     if (!session) return;
 
     const updatedExercises = [...session.exercises];
+    // Parse string values to numbers before saving
+    const reps = typeof editingSet.reps === 'string'
+      ? parseInt(editingSet.reps) || 0
+      : editingSet.reps;
+    const weight = typeof editingSet.weight === 'string'
+      ? parseFloat(editingSet.weight.replace(',', '.')) || 0
+      : editingSet.weight;
+
     updatedExercises[editingSet.exerciseIndex].sets[editingSet.setIndex] = {
       ...updatedExercises[editingSet.exerciseIndex].sets[editingSet.setIndex],
-      reps: editingSet.reps,
-      weight: editingSet.weight,
+      reps,
+      weight,
     };
 
     // Update session in store
@@ -189,15 +230,25 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
 
   const handleSetFieldChange = (field, value, e) => {
     e.stopPropagation();
-    // Validate numeric input (normalize comma to period for European decimals)
-    const numValue = parseFloat(String(value).replace(',', '.'));
-    if (isNaN(numValue) || numValue < 0) return;
 
-    // Apply limits
-    if (field === 'reps' && numValue > 100) return;
-    if (field === 'weight' && numValue > 500) return;
-
-    setEditingSet({ ...editingSet, [field]: numValue });
+    if (field === 'reps') {
+      // Allow empty and numbers only for reps
+      if (value === '' || /^[0-9]*$/.test(value)) {
+        const numValue = parseInt(value);
+        if (value === '' || isNaN(numValue) || (numValue >= 0 && numValue <= 100)) {
+          setEditingSet({ ...editingSet, [field]: value });
+        }
+      }
+    } else if (field === 'weight') {
+      // Allow empty, numbers, and decimal separators (. or ,) for weight
+      if (value === '' || /^[0-9]*[.,]?[0-9]*$/.test(value)) {
+        const normalizedValue = String(value).replace(',', '.');
+        const numValue = parseFloat(normalizedValue);
+        if (value === '' || isNaN(numValue) || (numValue >= 0 && numValue <= 500)) {
+          setEditingSet({ ...editingSet, [field]: value });
+        }
+      }
+    }
   };
 
   const handleKeyDown = (e, sessionId) => {
@@ -301,13 +352,8 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
 
       {/* Sessions List */}
       {sessions.length > 0 && (
-        <motion.div
-          variants={staggerContainer}
-          initial="initial"
-          animate="animate"
-          className="space-y-3"
-        >
-          {visibleSessions.map((session) => {
+        <div className="space-y-3">
+          {visibleSessions.map((session, index) => {
           const stats = calculateStats(session);
 
           // Get muscle groups from exercises
@@ -316,8 +362,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
           return (
             <motion.div
               key={session.id}
-              variants={staggerItem}
-              layout
+              initial={{ opacity: 0, y: 20 }}
               animate={
                 deletingSession === session.id
                   ? {
@@ -325,8 +370,12 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                       x: -100,
                       scale: 0.8,
                     }
-                  : {}
+                  : {
+                      opacity: 1,
+                      y: 0
+                    }
               }
+              transition={{ duration: 0.3, delay: index < 5 ? index * 0.1 : 0 }}
               className="bg-white border-2 border-mono-900 overflow-hidden hover:border-mono-700 transition-colors relative cursor-pointer"
               onClick={() => handleOpenSession(session)}
             >
@@ -448,7 +497,7 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
             </motion.div>
           );
         })}
-      </motion.div>
+      </div>
       )}
 
       {/* Load More Button */}

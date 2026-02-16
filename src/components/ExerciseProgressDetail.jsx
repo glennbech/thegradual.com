@@ -4,7 +4,7 @@ import { X, TrendingUp, Dumbbell, BarChart3 } from 'lucide-react';
 import { getMuscleColor } from '../utils/design-system';
 import { formatWeight, formatVolume } from '../utils/progressCalculations';
 
-export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClose }) {
+export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClose, onSessionClick }) {
   if (!isOpen) return null;
 
   const exerciseType = stats.exerciseType || 'weight+reps';
@@ -26,8 +26,40 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
     // Time-based metrics
     maxDuration: session.maxDuration,
     totalDuration: session.totalDuration,
-    sets: session.sets
+    sets: session.sets,
+    sessionId: session.sessionId // Add session ID for navigation
   }));
+
+  // Calculate Y-axis domain for better visualization
+  const calculateDomain = (dataKey) => {
+    const values = chartData.map(d => d[dataKey]).filter(v => v != null && v > 0);
+    if (values.length === 0) return ['auto', 'auto'];
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+
+    // Add 15% padding above and below
+    const padding = range > 0 ? range * 0.15 : max * 0.1;
+
+    return [
+      Math.max(0, Math.floor(min - padding)),
+      Math.ceil(max + padding)
+    ];
+  };
+
+  // Get domains for each metric
+  const primaryDomain = calculateDomain(
+    exerciseType === 'time-based' ? 'maxDuration' :
+    exerciseType === 'reps-only' ? 'maxReps' :
+    'maxWeight'
+  );
+
+  const secondaryDomain = calculateDomain(
+    exerciseType === 'time-based' ? 'totalDuration' :
+    exerciseType === 'reps-only' ? 'totalReps' :
+    'volume'
+  );
 
   const muscleColor = getMuscleColor(exercise.muscleGroup || exercise.category?.toLowerCase() || 'core');
 
@@ -36,7 +68,7 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-4 border-2 border-mono-900 shadow-lg">
+        <div className="bg-white p-4 border-2 border-mono-900 shadow-lg cursor-pointer">
           <p className="font-bold text-mono-900 mb-2">{data.fullDate}</p>
           {payload.map((entry, index) => {
             let unit = '';
@@ -57,6 +89,9 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
             );
           })}
           <p className="text-xs text-mono-500 mt-1">{data.sets} sets</p>
+          <p className="text-xs text-mono-500 mt-2 italic border-t border-mono-200 pt-2">
+            Click to view session
+          </p>
         </div>
       );
     }
@@ -212,6 +247,7 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                         <YAxis
                           stroke="#6b7280"
                           style={{ fontSize: '12px', fontWeight: 600 }}
+                          domain={primaryDomain}
                           label={{
                             value: exerciseType === 'time-based' ? 'Duration (s)' :
                                    exerciseType === 'reps-only' ? 'Reps' :
@@ -233,8 +269,31 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                           name={exerciseType === 'time-based' ? 'Max Duration (s)' :
                                 exerciseType === 'reps-only' ? 'Max Reps' :
                                 'Max Weight (kg)'}
-                          dot={{ fill: muscleColor, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                          activeDot={{ r: 7 }}
+                          dot={{
+                            fill: muscleColor,
+                            r: 5,
+                            strokeWidth: 2,
+                            stroke: '#fff',
+                            cursor: 'pointer',
+                            onClick: (data) => {
+                              if (data && data.sessionId) {
+                                console.log('[ExerciseProgressDetail] Clicked data point:', data);
+                                onSessionClick(data.sessionId);
+                                onClose();
+                              }
+                            }
+                          }}
+                          activeDot={{
+                            r: 7,
+                            cursor: 'pointer',
+                            onClick: (data) => {
+                              if (data && data.sessionId) {
+                                console.log('[ExerciseProgressDetail] Clicked active dot:', data);
+                                onSessionClick(data.sessionId);
+                                onClose();
+                              }
+                            }
+                          }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -274,6 +333,7 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                         <YAxis
                           stroke="#6b7280"
                           style={{ fontSize: '12px', fontWeight: 600 }}
+                          domain={secondaryDomain}
                           label={{
                             value: exerciseType === 'time-based' ? 'Duration (s)' :
                                    exerciseType === 'reps-only' ? 'Total Reps' :
@@ -295,8 +355,31 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                           name={exerciseType === 'time-based' ? 'Total Duration (s)' :
                                 exerciseType === 'reps-only' ? 'Total Reps' :
                                 'Volume (kg)'}
-                          dot={{ fill: muscleColor, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                          activeDot={{ r: 7 }}
+                          dot={{
+                            fill: muscleColor,
+                            r: 5,
+                            strokeWidth: 2,
+                            stroke: '#fff',
+                            cursor: 'pointer',
+                            onClick: (data) => {
+                              if (data && data.sessionId) {
+                                console.log('[ExerciseProgressDetail] Clicked data point:', data);
+                                onSessionClick(data.sessionId);
+                                onClose();
+                              }
+                            }
+                          }}
+                          activeDot={{
+                            r: 7,
+                            cursor: 'pointer',
+                            onClick: (data) => {
+                              if (data && data.sessionId) {
+                                console.log('[ExerciseProgressDetail] Clicked active dot:', data);
+                                onSessionClick(data.sessionId);
+                                onClose();
+                              }
+                            }
+                          }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -345,7 +428,8 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                       {[...stats.allSessions].reverse().map((session, index) => (
                         <tr
                           key={session.sessionId}
-                          className="border-b border-mono-200 hover:bg-mono-50 transition-colors"
+                          onClick={() => onSessionClick && onSessionClick(session.sessionId)}
+                          className="border-b border-mono-200 hover:bg-mono-100 transition-colors cursor-pointer"
                         >
                           <td className="py-3 px-4 text-sm font-medium text-mono-900">
                             {new Date(session.date).toLocaleDateString('en-US', {

@@ -1,9 +1,10 @@
-import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download, FileText } from 'lucide-react';
+import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download, FileText, Timer } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { awsConfig } from '../config/aws';
 import useWorkoutStore from '../stores/workoutStore';
 import { exportWorkoutDataToPDF } from '../utils/pdfExport';
+import { useState } from 'react';
 
 export default function Profile() {
   const { user, identityId, isAuthenticated, signIn, signOut } = useAuth();
@@ -14,6 +15,12 @@ export default function Profile() {
   const customTemplates = useWorkoutStore((state) => state.customTemplates);
   const activeSession = useWorkoutStore((state) => state.activeSession);
   const bodyMeasurements = useWorkoutStore((state) => state.bodyMeasurements);
+  const restTimerDuration = useWorkoutStore((state) => state.restTimerDuration);
+  const setRestTimerDuration = useWorkoutStore((state) => state.setRestTimerDuration);
+
+  // Local state for rest timer
+  const [localRestTimer, setLocalRestTimer] = useState(restTimerDuration);
+  const [isSavingTimer, setIsSavingTimer] = useState(false);
 
   // Get localStorage stats for debug
   const getLocalStorageStats = () => {
@@ -92,6 +99,31 @@ export default function Profile() {
     };
 
     exportWorkoutDataToPDF(allData);
+  };
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle rest timer duration change
+  const handleRestTimerChange = async (value) => {
+    const numValue = parseInt(value, 10);
+    setLocalRestTimer(numValue);
+  };
+
+  // Save rest timer to store
+  const handleSaveRestTimer = async () => {
+    setIsSavingTimer(true);
+    try {
+      await setRestTimerDuration(localRestTimer);
+    } catch (error) {
+      console.error('Failed to save rest timer:', error);
+    } finally {
+      setIsSavingTimer(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -237,6 +269,70 @@ export default function Profile() {
             <p className="text-xs text-mono-600">
               Your workout data is automatically synced to the cloud. You can access it from any device by signing in.
             </p>
+          </div>
+        </div>
+
+        {/* Workout Settings */}
+        <div className="bg-white rounded-lg p-6 border border-mono-200">
+          <h2 className="text-lg font-bold text-mono-900 mb-4 flex items-center gap-2">
+            <Timer className="w-5 h-5 text-[#F97316]" strokeWidth={2} />
+            Workout Settings
+          </h2>
+
+          <div className="space-y-4">
+            {/* Rest Timer Setting */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-mono-900">Rest Timer Duration</div>
+                  <div className="text-xs text-mono-600">Time between sets (1-5 minutes)</div>
+                </div>
+                <div className="text-2xl font-bold text-[#F97316]">
+                  {formatTime(localRestTimer)}
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex gap-2 mb-3">
+                {[60, 120, 180, 240, 300].map((seconds) => (
+                  <button
+                    key={seconds}
+                    onClick={() => setLocalRestTimer(seconds)}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      localRestTimer === seconds
+                        ? 'bg-[#F97316] text-white'
+                        : 'bg-mono-100 text-mono-700 hover:bg-mono-200'
+                    }`}
+                  >
+                    {formatTime(seconds)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Slider */}
+              <input
+                type="range"
+                min="60"
+                max="300"
+                step="15"
+                value={localRestTimer}
+                onChange={(e) => handleRestTimerChange(e.target.value)}
+                className="w-full h-2 bg-mono-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#F97316] [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F97316] [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+              />
+
+              {/* Save Button */}
+              {localRestTimer !== restTimerDuration && (
+                <motion.button
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={handleSaveRestTimer}
+                  disabled={isSavingTimer}
+                  className="w-full mt-4 px-6 py-3 bg-[#F97316] hover:bg-[#EA580C] text-white rounded-lg transition-colors font-semibold uppercase tracking-wide text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingTimer ? 'Saving...' : 'Save Changes'}
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
 

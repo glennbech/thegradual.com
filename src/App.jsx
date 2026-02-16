@@ -48,12 +48,29 @@ function AppContent() {
   const [completedSessionId, setCompletedSessionId] = useState(null) // Track just-completed session
   const [transferUserId, setTransferUserId] = useState(null) // Transfer from another device
   const [templateToEdit, setTemplateToEdit] = useState(null) // Template being edited in Plan page
+  const [expandedSessionId, setExpandedSessionId] = useState(null) // Session to expand from Analyze page
   const userId = getUserId() // Get or create user UUID
 
   // Memoize the clear function to prevent infinite loops
   const handleClearExpandedSession = useCallback(() => {
     setCompletedSessionId(null)
+    setExpandedSessionId(null)
   }, [])
+
+  // Navigate to history with a specific session opened
+  const handleNavigateToSession = useCallback((sessionId) => {
+    console.log('[App] handleNavigateToSession called with sessionId:', sessionId);
+    setExpandedSessionId(sessionId);
+    console.log('[App] expandedSessionId state will be set to:', sessionId);
+    console.log('[App] Setting currentView to history');
+    setCurrentView('history');
+    window.history.pushState({ view: 'history' }, '', '/history');
+  }, [])
+
+  // Debug log when expandedSessionId changes
+  useEffect(() => {
+    console.log('[App] expandedSessionId changed to:', expandedSessionId);
+  }, [expandedSessionId]);
 
   // Load data from DynamoDB when user is authenticated
   useEffect(() => {
@@ -316,13 +333,13 @@ function AppContent() {
               {currentView === 'history' && (
                 <SessionHistory
                   onDoItAgain={handleDoItAgain}
-                  initialExpandedSessionId={completedSessionId}
+                  initialExpandedSessionId={completedSessionId || expandedSessionId}
                   onClearExpandedSession={handleClearExpandedSession}
                 />
               )}
 
               {currentView === 'analyze' && (
-                <Analyze />
+                <Analyze onNavigateToSession={handleNavigateToSession} />
               )}
 
               {currentView === 'body' && (

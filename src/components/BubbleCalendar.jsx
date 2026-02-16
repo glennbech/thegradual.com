@@ -56,7 +56,7 @@ export default function BubbleCalendar({ sessions }) {
             const sessionVolume = (session.exercises || []).reduce((exTotal, exercise) => {
               const exerciseType = exercise.exerciseType || 'weight+reps';
               const exerciseVolume = (exercise.sets || [])
-                .filter(set => set.setType !== 'warm-up')
+                .filter(set => set.setType === 'working')
                 .reduce((setTotal, set) => {
                   // Only calculate volume for weight+reps exercises
                   if (exerciseType === 'weight+reps') {
