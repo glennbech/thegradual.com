@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, ListChecks, Save, ChevronUp, ChevronDown, X, GripVertical } from 'lucide-react'
 import { staggerContainer, staggerItem, pageTransition } from '../utils/animations'
@@ -40,6 +40,22 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
     loadExercises()
   }, [])
 
+  // Memoize previous session data to avoid expensive lookups on every click
+  // This caches the result of getPreviousSessionForExercise for all exercises
+  const previousSessionCache = useMemo(() => {
+    const cache = new Map()
+    // Only compute if there's an active session (otherwise it's not used)
+    if (activeSession) {
+      exercises.forEach(ex => {
+        const prev = getPreviousSessionForExercise(ex.id)
+        if (prev) {
+          cache.set(ex.id, prev)
+        }
+      })
+    }
+    return cache
+  }, [activeSession?.id, exercises.length, getPreviousSessionForExercise]) // Recompute when session changes or exercise list changes
+
   // Load template for editing when editTemplate prop changes
   useEffect(() => {
     if (editTemplate && exercises.length > 0) {
@@ -71,14 +87,14 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
     setExercises(data)
   }
 
-  const handleAddExercise = (exercise) => {
+  const handleAddExercise = useCallback((exercise) => {
     // Check if there's an active workout session
     if (activeSession) {
       // Add exercise to active session
       const exerciseType = exercise.exerciseType || 'weight+reps'
 
-      // Try to get previous session data for this exercise
-      const prevExercise = getPreviousSessionForExercise(exercise.id)
+      // Use cached previous session data instead of expensive lookup
+      const prevExercise = previousSessionCache.get(exercise.id)
 
       // Copy sets from previous session if available, otherwise use defaults
       let defaultSets = []
@@ -148,16 +164,16 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
         setShowWorkoutPanel(true)
       }
     }
-  }
+  }, [activeSession, previousSessionCache, selectedExercises, updateActiveSession])
 
-  const handleRemoveExercise = (id) => {
+  const handleRemoveExercise = useCallback((id) => {
     setSelectedExercises(selectedExercises.filter(ex => ex.id !== id))
-  }
+  }, [selectedExercises])
 
-  const handleRequestDeleteExercise = (exerciseId) => {
+  const handleRequestDeleteExercise = useCallback((exerciseId) => {
     setExerciseToDelete(exerciseId)
     setShowDeleteExerciseConfirm(true)
-  }
+  }, [])
 
   const handleConfirmDeleteExercise = async () => {
     if (!exerciseToDelete) return
@@ -239,13 +255,29 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
     }
   }
 
-  const filteredExercises = exercises.filter(ex => {
-    const matchesSearch = ex.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filter === 'all' || ex.category === filter
-    return matchesSearch && matchesFilter
-  })
+  // Memoize expensive filtering to prevent recalculation on every render
+  const filteredExercises = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase() // Only compute once
+    return exercises.filter(ex => {
+      const matchesSearch = ex.name.toLowerCase().includes(searchLower)
+      const matchesFilter = filter === 'all' || ex.category === filter
+      return matchesSearch && matchesFilter
+    })
+  }, [exercises, searchTerm, filter])
 
-  const categories = ['all', ...new Set(exercises.map(ex => ex.category))]
+  // Memoize categories to prevent Set reconstruction on every render
+  const categories = useMemo(() => {
+    return ['all', ...new Set(exercises.map(ex => ex.category))]
+  }, [exercises])
+
+  // Create Sets for O(1) lookups instead of O(n) array.some/find in render loop
+  const selectedExerciseIds = useMemo(() => {
+    return new Set(selectedExercises.map(ex => ex.id))
+  }, [selectedExercises])
+
+  const defaultExerciseIds = useMemo(() => {
+    return new Set(defaultExercises.map(ex => ex.id))
+  }, []) // defaultExercises is static import, only compute once
 
   return (
     <motion.div
@@ -452,8 +484,9 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
 
             {/* Exercise Cards */}
             {filteredExercises.map((exercise) => {
-              const isSelected = selectedExercises.some(ex => ex.id === exercise.id)
-              const isCustom = !defaultExercises.find(ex => ex.id === exercise.id)
+              // O(1) Set lookups instead of O(n) array searches
+              const isSelected = selectedExerciseIds.has(exercise.id)
+              const isCustom = !defaultExerciseIds.has(exercise.id)
 
               return (
                 <motion.div key={exercise.id} variants={staggerItem}>
