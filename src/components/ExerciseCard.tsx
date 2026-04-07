@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { motion } from 'framer-motion'
 import { Dumbbell, Trash2, Plus, Info } from 'lucide-react'
 import { cardHover } from '../utils/animations'
@@ -14,7 +14,8 @@ interface ExerciseCardProps {
   showDelete?: boolean;
 }
 
-export default function ExerciseCard({ exercise, onAdd, onDelete, showDelete = false }: ExerciseCardProps) {
+// Memoize to prevent unnecessary re-renders when parent updates
+function ExerciseCard({ exercise, onAdd, onDelete, showDelete = false }: ExerciseCardProps) {
   const [showDetail, setShowDetail] = useState(false)
   const muscleGroupConfig = {
     chest: {
@@ -104,3 +105,14 @@ export default function ExerciseCard({ exercise, onAdd, onDelete, showDelete = f
     </>
   )
 }
+
+// Export memoized version with custom comparison
+export default memo(ExerciseCard, (prevProps, nextProps) => {
+  // Only re-render if these props actually change
+  return (
+    prevProps.exercise.id === nextProps.exercise.id &&
+    prevProps.showDelete === nextProps.showDelete &&
+    prevProps.onAdd === nextProps.onAdd &&
+    prevProps.onDelete === nextProps.onDelete
+  )
+})

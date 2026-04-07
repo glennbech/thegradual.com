@@ -176,7 +176,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
         </div>
 
         {/* Stats Container - Clear typographic hierarchy */}
-        <div className="px-4 py-6">
+        <div className="px-4 py-3">
           {/* PRIMARY: Current Timer - Dominant element */}
           <AnimatePresence mode="wait">
             {isResting ? (
@@ -186,9 +186,9 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.8, opacity: 0, y: 10 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="mb-6"
+                className="mb-3"
               >
-                <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-4 mb-2">
                   <motion.div
                     animate={{
                       rotate: [0, -15, 15, -15, 15, 0],
@@ -200,12 +200,12 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                       ease: "easeInOut"
                     }}
                   >
-                    <Clock className="w-10 h-10 text-pink-400" strokeWidth={2.5} />
+                    <Clock className="w-8 h-8 text-pink-400" strokeWidth={2.5} />
                   </motion.div>
                   <div className="flex-1">
                     <div className="text-xs text-pink-300 uppercase tracking-widest mb-1 font-bold">Rest</div>
                     <motion.div
-                      className="text-5xl font-black text-pink-400 tabular-nums leading-none"
+                      className="text-4xl font-black text-pink-400 tabular-nums leading-none"
                       animate={{
                         scale: restTimeRemaining <= 10 ? [1, 1.1, 1] : 1,
                         color: restTimeRemaining <= 10 ? ['#f9a8d4', '#ec4899', '#f9a8d4'] : '#f9a8d4'
@@ -256,12 +256,12 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.8, opacity: 0, y: -10 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-center gap-4 mb-6"
+                className="flex items-center gap-4 mb-3"
               >
-                <Clock className="w-10 h-10 text-white" strokeWidth={2.5} />
+                <Clock className="w-8 h-8 text-white" strokeWidth={2.5} />
                 <div className="flex-1">
                   <div className="text-xs text-white/60 uppercase tracking-widest mb-1">Exercise Time</div>
-                  <div className="text-5xl font-black text-white tabular-nums leading-none">
+                  <div className="text-4xl font-black text-white tabular-nums leading-none">
                     {Math.floor(exerciseTime / 60)}:{String(exerciseTime % 60).padStart(2, '0')}
                   </div>
                 </div>
@@ -270,7 +270,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
           </AnimatePresence>
 
           {/* SECONDARY: Context info - smaller, consistent sizing */}
-          <div className="flex items-center justify-between text-white/80 mb-4">
+          <div className="flex items-center justify-between text-white/80 mb-3">
             <div className="flex items-center gap-2">
               <Dumbbell className="w-4 h-4" strokeWidth={2.5} />
               <span className="text-sm font-medium">

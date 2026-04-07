@@ -199,3 +199,59 @@ export async function checkAPIHealth() {
     return false;
   }
 }
+
+/**
+ * Get AI-powered workout insights
+ * Analyzes user's workout history using AWS Bedrock (Claude) and hypertrophy research
+ * @param {Object} userData - User's workout data (sessions, exercises, templates, etc.)
+ * @returns {Promise<Object>} Insights object with analysis and recommendations
+ * @throws {Error} If user is not authenticated or API call fails
+ */
+export async function getWorkoutInsights(userData) {
+  // Get ID token from localStorage (set by AuthContext)
+  const idToken = localStorage.getItem('idToken');
+
+  if (!idToken) {
+    throw new Error('Authentication required. Please sign in to get workout insights.');
+  }
+
+  // Lambda Function URL (from Terraform output)
+  const INSIGHTS_API_URL = import.meta.env.VITE_INSIGHTS_API_URL ||
+    'https://b255hnwm4mwqcksxqwtwftc6rq0ggzwy.lambda-url.us-east-2.on.aws/';
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout (Bedrock AI analysis can take 30-60s)
+
+    const response = await fetch(INSIGHTS_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(userData),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.status === 401) {
+      throw new Error('Your session has expired. Please sign in again.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status} ${response.statusText}`);
+    }
+
+    const insights = await response.json();
+    return insights;
+
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - AI analysis is taking longer than expected. Please try again.');
+    }
+    console.error('Error fetching workout insights:', error);
+    throw error;
+  }
+}

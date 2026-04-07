@@ -12,7 +12,8 @@ locals {
   }
 
   # Lambda function names
-  lambda_user_state_name = "${local.name_prefix}-user-state"
+  lambda_user_state_name     = "${local.name_prefix}-user-state"
+  lambda_workout_insights_name = "${local.name_prefix}-workout-insights"
 
   # DynamoDB table names
   user_states_table_name = "${local.name_prefix}-user-states"

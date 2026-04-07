@@ -565,22 +565,12 @@ func decodeIDToken(tokenString string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 
-	// Extract relevant user information
+	// Return ALL claims instead of selective extraction
+	// This ensures custom Cognito attributes (like custom:plan, custom:isAdmin, etc.)
+	// are preserved across token refreshes
 	user := make(map[string]interface{})
-	if email, ok := claims["email"].(string); ok {
-		user["email"] = email
-	}
-	if name, ok := claims["name"].(string); ok {
-		user["name"] = name
-	}
-	if givenName, ok := claims["given_name"].(string); ok {
-		user["given_name"] = givenName
-	}
-	if familyName, ok := claims["family_name"].(string); ok {
-		user["family_name"] = familyName
-	}
-	if sub, ok := claims["sub"].(string); ok {
-		user["sub"] = sub
+	for key, value := range claims {
+		user[key] = value
 	}
 
 	return user, nil
@@ -596,8 +586,8 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   config.SecureFlag,
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   30 * 24 * 60 * 60, // 30 days
+		SameSite: http.SameSiteNoneMode, // Allow cross-site requests (Lambda URL → CloudFront)
+		MaxAge:   30 * 24 * 60 * 60,     // 30 days
 	}
 
 	if config.CookieDomain != "" {
@@ -614,8 +604,8 @@ func clearRefreshTokenCookie(w http.ResponseWriter) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   config.SecureFlag,
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   -1, // Delete the cookie
+		SameSite: http.SameSiteNoneMode, // Must match original cookie setting
+		MaxAge:   -1,                    // Delete the cookie
 	}
 
 	if config.CookieDomain != "" {

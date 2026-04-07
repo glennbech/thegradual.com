@@ -1,0 +1,13 @@
+{
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/"
+    }
+  },
+  "headers": {
+    "content-type": "application/json",
+    "authorization": "Bearer test.token.here"
+  },
+  "body": "{\"sessions\":[]}"
+}

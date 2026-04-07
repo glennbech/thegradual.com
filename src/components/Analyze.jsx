@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Sparkles } from 'lucide-react';
 import useWorkoutStore from '../stores/workoutStore';
 import { getMuscleColor } from '../utils/design-system';
 import {
@@ -15,9 +15,11 @@ import {
   getExerciseStats,
   calculateTrend
 } from '../utils/progressCalculations';
+import { getWorkoutInsights } from '../services/apiClient';
 import StrengthChart from './StrengthChart';
 import ExerciseProgressCard from './ExerciseProgressCard';
 import ExerciseProgressDetail from './ExerciseProgressDetail';
+import InsightsModal from './InsightsModal';
 import { pageTransition, staggerContainer, staggerItem } from '../utils/animations';
 import defaultExercises from '../data/exercises.json';
 
@@ -29,6 +31,12 @@ export default function Analyze({ onNavigateToSession }) {
   const [expandedExerciseId, setExpandedExerciseId] = useState(null);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [selectedStats, setSelectedStats] = useState(null);
+
+  // AI Insights state
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState(null);
 
   // Handle session click - navigate to history with selected session
   const handleSessionClick = (sessionId) => {
@@ -99,6 +107,38 @@ export default function Analyze({ onNavigateToSession }) {
   const handleCloseDetail = () => {
     setSelectedExercise(null);
     setSelectedStats(null);
+  };
+
+  // Handle AI insights request
+  const handleGetInsights = async () => {
+    setShowInsightsModal(true);
+    setInsightsLoading(true);
+    setInsightsError(null);
+    setInsights(null);
+
+    try {
+      // Get complete user state from store
+      const workoutState = useWorkoutStore.getState();
+      const userData = {
+        sessions: workoutState.sessions,
+        customExercises: workoutState.customExercises,
+        customTemplates: workoutState.customTemplates,
+        activeSession: workoutState.activeSession,
+        bodyMeasurements: workoutState.bodyMeasurements || []
+      };
+
+      const result = await getWorkoutInsights(userData);
+      setInsights(result);
+    } catch (error) {
+      console.error('Error fetching insights:', error);
+      setInsightsError(error.message || 'Failed to get workout insights. Please try again.');
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
+  const handleCloseInsightsModal = () => {
+    setShowInsightsModal(false);
   };
 
   // Expandable card for exercise details
@@ -342,6 +382,27 @@ export default function Analyze({ onNavigateToSession }) {
         </p>
       </div>
 
+      {/* AI Insights Button */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <button
+          onClick={handleGetInsights}
+          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 group"
+        >
+          <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+          <span className="uppercase tracking-wide text-lg">Get AI Insights</span>
+          <div className="bg-white/20 px-2 py-1 rounded text-xs uppercase">
+            Claude 3.5
+          </div>
+        </button>
+        <p className="text-center text-xs text-mono-500 mt-2 uppercase tracking-wide">
+          AI-powered analysis based on peer-reviewed hypertrophy research
+        </p>
+      </motion.div>
+
       {/* Exercise Progress Section */}
       {performedExercises.length > 0 && (
         <motion.section variants={staggerContainer} initial="initial" animate="animate">
@@ -444,6 +505,15 @@ export default function Analyze({ onNavigateToSession }) {
           onSessionClick={handleSessionClick}
         />
       )}
+
+      {/* AI Insights Modal */}
+      <InsightsModal
+        isOpen={showInsightsModal}
+        onClose={handleCloseInsightsModal}
+        insights={insights}
+        loading={insightsLoading}
+        error={insightsError}
+      />
     </motion.div>
   );
 }

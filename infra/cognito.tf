@@ -81,6 +81,12 @@ resource "aws_cognito_user_pool_client" "server" {
 
   generate_secret = true # confidential client
 
+  # Enable auth flows for testing and password-based login
+  explicit_auth_flows = [
+    "ALLOW_ADMIN_USER_PASSWORD_AUTH",  # Enable admin auth for testing
+    "ALLOW_REFRESH_TOKEN_AUTH"         # Keep refresh token support
+  ]
+
   supported_identity_providers = concat(
     ["COGNITO"],
     var.google_client_id != "" ? ["Google"] : []

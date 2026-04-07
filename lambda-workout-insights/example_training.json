@@ -1,0 +1,320 @@
+{
+  "user_id": "test-user-123",
+  "sessions": [
+    {
+      "id": "session-1",
+      "date": "2025-03-01T10:00:00Z",
+      "templateReference": {
+        "templateId": "push-day",
+        "templateName": "Push Day"
+      },
+      "exercises": [
+        {
+          "id": "chest-1",
+          "name": "Barbell Bench Press",
+          "category": "Chest",
+          "sets": [
+            {"reps": 10, "weight": 80, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 85, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 90, "completed": true, "setType": "working"},
+            {"reps": 5, "weight": 95, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "chest-2",
+          "name": "Incline Dumbbell Press",
+          "category": "Chest",
+          "sets": [
+            {"reps": 10, "weight": 30, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 30, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 35, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "shoulders-1",
+          "name": "Overhead Press",
+          "category": "Shoulders",
+          "sets": [
+            {"reps": 8, "weight": 50, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 50, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 55, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "arms-1",
+          "name": "Tricep Pushdown",
+          "category": "Arms",
+          "sets": [
+            {"reps": 12, "weight": 40, "completed": true, "setType": "working"},
+            {"reps": 12, "weight": 40, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 45, "completed": true, "setType": "working"}
+          ]
+        }
+      ],
+      "completedAt": "2025-03-01T11:15:00Z",
+      "status": "completed"
+    },
+    {
+      "id": "session-2",
+      "date": "2025-03-03T10:00:00Z",
+      "templateReference": {
+        "templateId": "pull-day",
+        "templateName": "Pull Day"
+      },
+      "exercises": [
+        {
+          "id": "back-1",
+          "name": "Deadlift",
+          "category": "Back",
+          "sets": [
+            {"reps": 5, "weight": 100, "completed": true, "setType": "working"},
+            {"reps": 5, "weight": 110, "completed": true, "setType": "working"},
+            {"reps": 5, "weight": 120, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "back-2",
+          "name": "Pull-ups",
+          "category": "Back",
+          "sets": [
+            {"reps": 8, "weight": 0, "completed": true, "setType": "working"},
+            {"reps": 7, "weight": 0, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 0, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "back-3",
+          "name": "Barbell Row",
+          "category": "Back",
+          "sets": [
+            {"reps": 8, "weight": 70, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 70, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 75, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "arms-2",
+          "name": "Barbell Curl",
+          "category": "Arms",
+          "sets": [
+            {"reps": 10, "weight": 30, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 30, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 35, "completed": true, "setType": "working"}
+          ]
+        }
+      ],
+      "completedAt": "2025-03-03T11:10:00Z",
+      "status": "completed"
+    },
+    {
+      "id": "session-3",
+      "date": "2025-03-05T10:00:00Z",
+      "templateReference": {
+        "templateId": "leg-day",
+        "templateName": "Leg Day"
+      },
+      "exercises": [
+        {
+          "id": "legs-1",
+          "name": "Squat",
+          "category": "Legs",
+          "sets": [
+            {"reps": 8, "weight": 100, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 100, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 110, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "legs-2",
+          "name": "Romanian Deadlift",
+          "category": "Legs",
+          "sets": [
+            {"reps": 10, "weight": 80, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 80, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 85, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "legs-3",
+          "name": "Leg Press",
+          "category": "Legs",
+          "sets": [
+            {"reps": 12, "weight": 150, "completed": true, "setType": "working"},
+            {"reps": 12, "weight": 150, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 170, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "core-1",
+          "name": "Ab Wheel Rollout",
+          "category": "Core",
+          "sets": [
+            {"reps": 15, "weight": 0, "completed": true, "setType": "working"},
+            {"reps": 15, "weight": 0, "completed": true, "setType": "working"},
+            {"reps": 12, "weight": 0, "completed": true, "setType": "working"}
+          ]
+        }
+      ],
+      "completedAt": "2025-03-05T11:20:00Z",
+      "status": "completed"
+    },
+    {
+      "id": "session-4",
+      "date": "2025-03-08T10:00:00Z",
+      "templateReference": {
+        "templateId": "push-day",
+        "templateName": "Push Day"
+      },
+      "exercises": [
+        {
+          "id": "chest-1",
+          "name": "Barbell Bench Press",
+          "category": "Chest",
+          "sets": [
+            {"reps": 10, "weight": 82.5, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 87.5, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 92.5, "completed": true, "setType": "working"},
+            {"reps": 5, "weight": 97.5, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "chest-2",
+          "name": "Incline Dumbbell Press",
+          "category": "Chest",
+          "sets": [
+            {"reps": 10, "weight": 32.5, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 32.5, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 35, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "shoulders-1",
+          "name": "Overhead Press",
+          "category": "Shoulders",
+          "sets": [
+            {"reps": 8, "weight": 52.5, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 52.5, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 57.5, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "arms-1",
+          "name": "Tricep Pushdown",
+          "category": "Arms",
+          "sets": [
+            {"reps": 12, "weight": 42.5, "completed": true, "setType": "working"},
+            {"reps": 12, "weight": 42.5, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 47.5, "completed": true, "setType": "working"}
+          ]
+        }
+      ],
+      "completedAt": "2025-03-08T11:15:00Z",
+      "status": "completed"
+    },
+    {
+      "id": "session-5",
+      "date": "2025-03-10T10:00:00Z",
+      "templateReference": {
+        "templateId": "pull-day",
+        "templateName": "Pull Day"
+      },
+      "exercises": [
+        {
+          "id": "back-1",
+          "name": "Deadlift",
+          "category": "Back",
+          "sets": [
+            {"reps": 5, "weight": 105, "completed": true, "setType": "working"},
+            {"reps": 5, "weight": 115, "completed": true, "setType": "working"},
+            {"reps": 5, "weight": 125, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "back-2",
+          "name": "Pull-ups",
+          "category": "Back",
+          "sets": [
+            {"reps": 9, "weight": 0, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 0, "completed": true, "setType": "working"},
+            {"reps": 7, "weight": 0, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "back-3",
+          "name": "Barbell Row",
+          "category": "Back",
+          "sets": [
+            {"reps": 8, "weight": 72.5, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 72.5, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 77.5, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "arms-2",
+          "name": "Barbell Curl",
+          "category": "Arms",
+          "sets": [
+            {"reps": 10, "weight": 32.5, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 32.5, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 35, "completed": true, "setType": "working"}
+          ]
+        }
+      ],
+      "completedAt": "2025-03-10T11:10:00Z",
+      "status": "completed"
+    },
+    {
+      "id": "session-6",
+      "date": "2025-03-15T10:00:00Z",
+      "templateReference": {
+        "templateId": "push-day",
+        "templateName": "Push Day"
+      },
+      "exercises": [
+        {
+          "id": "chest-1",
+          "name": "Barbell Bench Press",
+          "category": "Chest",
+          "sets": [
+            {"reps": 10, "weight": 85, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 90, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 95, "completed": true, "setType": "working"},
+            {"reps": 5, "weight": 100, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "chest-2",
+          "name": "Incline Dumbbell Press",
+          "category": "Chest",
+          "sets": [
+            {"reps": 10, "weight": 35, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 35, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 37.5, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "shoulders-1",
+          "name": "Overhead Press",
+          "category": "Shoulders",
+          "sets": [
+            {"reps": 8, "weight": 55, "completed": true, "setType": "working"},
+            {"reps": 8, "weight": 55, "completed": true, "setType": "working"},
+            {"reps": 6, "weight": 60, "completed": true, "setType": "working"}
+          ]
+        },
+        {
+          "id": "arms-1",
+          "name": "Tricep Pushdown",
+          "category": "Arms",
+          "sets": [
+            {"reps": 12, "weight": 45, "completed": true, "setType": "working"},
+            {"reps": 12, "weight": 45, "completed": true, "setType": "working"},
+            {"reps": 10, "weight": 50, "completed": true, "setType": "working"}
+          ]
+        }
+      ],
+      "completedAt": "2025-03-15T11:15:00Z",
+      "status": "completed"
+    }
+  ]
+}
