@@ -117,7 +117,7 @@ export default function LandingPage() {
         )}
       </AnimatePresence>
       {/* Hero Section with Background Image */}
-      <div className="relative h-[600px] bg-mono-900 overflow-hidden">
+      <div className="relative min-h-screen md:min-h-[600px] bg-mono-900 overflow-hidden">
         {/* Hero Image - Using Unsplash gym/fitness photo */}
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -131,7 +131,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-mono-900/90 to-mono-900/70" />
 
         {/* Hero Content */}
-        <div className="relative container mx-auto px-4 h-full flex items-center">
+        <div className="relative container mx-auto px-4 py-20 min-h-screen md:min-h-[600px] flex items-center">
           <motion.div
             initial={{ opacity: 0, x: -40 }}
             animate={{ opacity: 1, x: 0 }}
@@ -155,7 +155,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.6 }}
-              className="text-5xl md:text-7xl font-black text-white mb-6 leading-tight"
+              className="text-4xl md:text-5xl lg:text-7xl font-black text-white mb-4 md:mb-6 leading-tight"
             >
               Track Every Rep.<br/>
               <span className="text-emerald-400">Master Every Goal.</span>
@@ -165,7 +165,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.6 }}
-              className="text-xl text-white/80 mb-8 leading-relaxed"
+              className="text-lg md:text-xl text-white/80 mb-6 md:mb-8 leading-relaxed"
             >
               Your scientifically-backed gym tracker. Log workouts, analyze strength standards, visualize progress, and achieve peak performance.
             </motion.p>
@@ -174,7 +174,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7, duration: 0.6 }}
-              className="text-lg text-white/70 mb-8 leading-relaxed"
+              className="text-base md:text-lg text-white/70 mb-6 md:mb-8 leading-relaxed"
             >
               Select from any of the workouts below, or create your own from the exercise library.
             </motion.p>

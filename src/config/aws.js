@@ -37,7 +37,10 @@ export const getAuthorizeUrl = () => {
     client_id: clientId,
     response_type: responseType,
     scope: scope.join(' '),
-    redirect_uri: redirectSignIn
+    redirect_uri: redirectSignIn,
+    identity_provider: 'Google',      // Skip Cognito picker, go straight to Google
+    prompt: 'select_account consent', // Force account picker AND consent screen
+    login_hint: `refresh_${Date.now()}` // Cache buster - forces Google to show picker every time
   });
 
   return `https://${domain}/oauth2/authorize?${params.toString()}`;

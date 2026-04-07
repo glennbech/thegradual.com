@@ -778,11 +778,15 @@ export default function ExerciseLogger({
                               // Time-based: Show duration only
                               `${set.duration || 30}s`
                             ) : getExerciseType(exercise) === 'reps-only' ? (
-                              // Reps-only: Show reps only
-                              `${set.reps} reps`
+                              // Reps-only: Show reps only (with original if deloaded)
+                              set.originalReps && set.originalReps !== set.reps
+                                ? `${set.reps} (${set.originalReps}) reps`
+                                : `${set.reps} reps`
                             ) : (
-                              // Weight+reps: Show reps × weight (default)
-                              `${set.reps} reps × ${set.weight}kg`
+                              // Weight+reps: Show reps × weight (with originals if deloaded)
+                              set.originalReps && set.originalWeight && (set.originalReps !== set.reps || set.originalWeight !== set.weight)
+                                ? `${set.reps} (${set.originalReps}) × ${set.weight} (${set.originalWeight})kg`
+                                : `${set.reps} reps × ${set.weight}kg`
                             )}
                           </p>
                           <div className="flex items-center gap-2 text-xs text-mono-500">

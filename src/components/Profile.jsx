@@ -1,10 +1,10 @@
-import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download, FileText, Timer } from 'lucide-react';
+import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download, FileText, Timer, Zap } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { awsConfig } from '../config/aws';
 import useWorkoutStore from '../stores/workoutStore';
 import { exportWorkoutDataToPDF } from '../utils/pdfExport';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Profile() {
   const { user, identityId, isAuthenticated, signIn, signOut } = useAuth();
@@ -18,9 +18,44 @@ export default function Profile() {
   const restTimerDuration = useWorkoutStore((state) => state.restTimerDuration);
   const setRestTimerDuration = useWorkoutStore((state) => state.setRestTimerDuration);
 
+  // Deload settings
+  const deloadMode = useWorkoutStore((state) => state.deloadMode);
+  const deloadRepsOnlyPercentage = useWorkoutStore((state) => state.deloadRepsOnlyPercentage);
+  const deloadWeightedRepsPercentage = useWorkoutStore((state) => state.deloadWeightedRepsPercentage);
+  const deloadWeightPercentage = useWorkoutStore((state) => state.deloadWeightPercentage);
+  const setDeloadSettings = useWorkoutStore((state) => state.setDeloadSettings);
+
   // Local state for rest timer
   const [localRestTimer, setLocalRestTimer] = useState(restTimerDuration);
   const [isSavingTimer, setIsSavingTimer] = useState(false);
+
+  // Local state for deload
+  const [localDeloadMode, setLocalDeloadMode] = useState(deloadMode);
+  const [localRepsOnlyPct, setLocalRepsOnlyPct] = useState(deloadRepsOnlyPercentage);
+  const [localWeightedRepsPct, setLocalWeightedRepsPct] = useState(deloadWeightedRepsPercentage);
+  const [localWeightPct, setLocalWeightPct] = useState(deloadWeightPercentage);
+  const [isSavingDeload, setIsSavingDeload] = useState(false);
+
+  // Sync local state with Zustand store (when store updates from API)
+  useEffect(() => {
+    setLocalRestTimer(restTimerDuration);
+  }, [restTimerDuration]);
+
+  useEffect(() => {
+    setLocalDeloadMode(deloadMode);
+  }, [deloadMode]);
+
+  useEffect(() => {
+    setLocalRepsOnlyPct(deloadRepsOnlyPercentage);
+  }, [deloadRepsOnlyPercentage]);
+
+  useEffect(() => {
+    setLocalWeightedRepsPct(deloadWeightedRepsPercentage);
+  }, [deloadWeightedRepsPercentage]);
+
+  useEffect(() => {
+    setLocalWeightPct(deloadWeightPercentage);
+  }, [deloadWeightPercentage]);
 
   // Get localStorage stats for debug
   const getLocalStorageStats = () => {
@@ -125,6 +160,25 @@ export default function Profile() {
       setIsSavingTimer(false);
     }
   };
+
+  // Handle deload settings save
+  const handleSaveDeload = async () => {
+    setIsSavingDeload(true);
+    try {
+      await setDeloadSettings(localDeloadMode, localRepsOnlyPct, localWeightedRepsPct, localWeightPct);
+    } catch (error) {
+      console.error('Failed to save deload settings:', error);
+    } finally {
+      setIsSavingDeload(false);
+    }
+  };
+
+  // Check if deload settings have changed
+  const deloadSettingsChanged =
+    localDeloadMode !== deloadMode ||
+    localRepsOnlyPct !== deloadRepsOnlyPercentage ||
+    localWeightedRepsPct !== deloadWeightedRepsPercentage ||
+    localWeightPct !== deloadWeightPercentage;
 
   if (!isAuthenticated) {
     // Anonymous user view
@@ -333,6 +387,182 @@ export default function Profile() {
                 </motion.button>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Deload Settings */}
+        <div className="bg-white rounded-lg p-6 border border-mono-200">
+          <h2 className="text-lg font-bold text-mono-900 mb-4 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-[#0D9488]" strokeWidth={2} />
+            Deload Mode
+          </h2>
+
+          <div className="space-y-6">
+            {/* Deload Mode Toggle */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <div className="text-sm font-semibold text-mono-900">Enable Deload Mode</div>
+                  <div className="text-xs text-mono-600">Reduce workout intensity for recovery</div>
+                </div>
+                <button
+                  onClick={() => setLocalDeloadMode(!localDeloadMode)}
+                  className={`relative w-14 h-8 rounded-full transition-colors ${
+                    localDeloadMode ? 'bg-[#0D9488]' : 'bg-mono-300'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${
+                      localDeloadMode ? 'transform translate-x-6' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+              {localDeloadMode && (
+                <div className="bg-[#0D9488]/5 border-2 border-[#0D9488]/20 rounded-lg p-3 mt-3">
+                  <p className="text-xs text-mono-700">
+                    When deload mode is active, reps and weight are reduced by the percentages below.
+                    Sessions are tagged as deload workouts in your history.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Bodyweight Reps Percentage */}
+            <div className={localDeloadMode ? 'opacity-100' : 'opacity-50 pointer-events-none'}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-mono-900">Bodyweight Reps %</div>
+                  <div className="text-xs text-mono-600">Push-ups, pull-ups (reps only)</div>
+                </div>
+                <div className="text-2xl font-bold text-[#0D9488]">
+                  {localRepsOnlyPct}%
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex gap-2 mb-3">
+                {[60, 70, 80, 90, 100].map((pct) => (
+                  <button
+                    key={`reps-only-${pct}`}
+                    onClick={() => setLocalRepsOnlyPct(pct)}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      localRepsOnlyPct === pct
+                        ? 'bg-[#0D9488] text-white'
+                        : 'bg-mono-100 text-mono-700 hover:bg-mono-200'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+
+              {/* Slider */}
+              <input
+                type="range"
+                min="60"
+                max="100"
+                step="5"
+                value={localRepsOnlyPct}
+                onChange={(e) => setLocalRepsOnlyPct(parseInt(e.target.value, 10))}
+                className="w-full h-2 bg-mono-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#0D9488] [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#0D9488] [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+              />
+            </div>
+
+            {/* Weighted Reps Percentage */}
+            <div className={localDeloadMode ? 'opacity-100' : 'opacity-50 pointer-events-none'}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-mono-900">Weighted Reps %</div>
+                  <div className="text-xs text-mono-600">Dumbbells, barbells (reps)</div>
+                </div>
+                <div className="text-2xl font-bold text-[#0D9488]">
+                  {localWeightedRepsPct}%
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex gap-2 mb-3">
+                {[60, 70, 80, 90, 100].map((pct) => (
+                  <button
+                    key={`weighted-reps-${pct}`}
+                    onClick={() => setLocalWeightedRepsPct(pct)}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      localWeightedRepsPct === pct
+                        ? 'bg-[#0D9488] text-white'
+                        : 'bg-mono-100 text-mono-700 hover:bg-mono-200'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+
+              {/* Slider */}
+              <input
+                type="range"
+                min="60"
+                max="100"
+                step="5"
+                value={localWeightedRepsPct}
+                onChange={(e) => setLocalWeightedRepsPct(parseInt(e.target.value, 10))}
+                className="w-full h-2 bg-mono-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#0D9488] [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#0D9488] [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+              />
+            </div>
+
+            {/* Weight Percentage */}
+            <div className={localDeloadMode ? 'opacity-100' : 'opacity-50 pointer-events-none'}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-mono-900">Weight Percentage</div>
+                  <div className="text-xs text-mono-600">How much weight during deload</div>
+                </div>
+                <div className="text-2xl font-bold text-[#0D9488]">
+                  {localWeightPct}%
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex gap-2 mb-3">
+                {[60, 70, 80, 90, 100].map((pct) => (
+                  <button
+                    key={`weight-${pct}`}
+                    onClick={() => setLocalWeightPct(pct)}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      localWeightPct === pct
+                        ? 'bg-[#0D9488] text-white'
+                        : 'bg-mono-100 text-mono-700 hover:bg-mono-200'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+
+              {/* Slider */}
+              <input
+                type="range"
+                min="60"
+                max="100"
+                step="5"
+                value={localWeightPct}
+                onChange={(e) => setLocalWeightPct(parseInt(e.target.value, 10))}
+                className="w-full h-2 bg-mono-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#0D9488] [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#0D9488] [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+              />
+            </div>
+
+            {/* Save Button */}
+            {deloadSettingsChanged && (
+              <motion.button
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={handleSaveDeload}
+                disabled={isSavingDeload}
+                className="w-full px-6 py-3 bg-[#0D9488] hover:bg-[#0F766E] text-white rounded-lg transition-colors font-semibold uppercase tracking-wide text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingDeload ? 'Saving...' : 'Save Deload Settings'}
+              </motion.button>
+            )}
           </div>
         </div>
 

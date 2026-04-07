@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Clock, Trash2, Plus, Minus, SkipForward } from 'lucide-react';
+import { Dumbbell, Clock, Trash2, Plus, Minus, SkipForward, Zap } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import useWorkoutStore from '../stores/workoutStore';
 import { formatDuration } from '../utils/design-system';
@@ -130,6 +130,11 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
   const currentExercise = activeSession.exercises[currentExerciseIndex];
 
   const isResting = activeSession.isResting || false;
+  const isDeload = activeSession.isDeload || false;
+
+  // Deload colors (calm teal/cyan) vs normal colors (black/pink)
+  const exerciseColor = isDeload ? '#0D9488' : '#111827'; // teal-600 vs black
+  const restColor = isDeload ? '#06B6D4' : '#ec4899';     // cyan-500 vs pink
 
   // Calculate completed exercises (all sets completed)
   const completedExercises = activeSession.exercises.filter(exercise =>
@@ -159,7 +164,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
       <motion.div
         className="border-b-4 border-mono-900"
         animate={{
-          backgroundColor: isResting ? '#ec4899' : '#111827'
+          backgroundColor: isResting ? restColor : exerciseColor
         }}
         transition={{ duration: 0.5 }}
       >
@@ -200,15 +205,17 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                       ease: "easeInOut"
                     }}
                   >
-                    <Clock className="w-8 h-8 text-pink-400" strokeWidth={2.5} />
+                    <Clock className={`w-8 h-8 ${isDeload ? 'text-cyan-300' : 'text-pink-400'}`} strokeWidth={2.5} />
                   </motion.div>
                   <div className="flex-1">
-                    <div className="text-xs text-pink-300 uppercase tracking-widest mb-1 font-bold">Rest</div>
+                    <div className={`text-xs uppercase tracking-widest mb-1 font-bold ${isDeload ? 'text-cyan-200' : 'text-pink-300'}`}>Rest</div>
                     <motion.div
-                      className="text-4xl font-black text-pink-400 tabular-nums leading-none"
+                      className={`text-4xl font-black tabular-nums leading-none ${isDeload ? 'text-cyan-300' : 'text-pink-400'}`}
                       animate={{
                         scale: restTimeRemaining <= 10 ? [1, 1.1, 1] : 1,
-                        color: restTimeRemaining <= 10 ? ['#f9a8d4', '#ec4899', '#f9a8d4'] : '#f9a8d4'
+                        color: restTimeRemaining <= 10
+                          ? (isDeload ? ['#67e8f9', '#06B6D4', '#67e8f9'] : ['#f9a8d4', '#ec4899', '#f9a8d4'])
+                          : (isDeload ? '#67e8f9' : '#f9a8d4')
                       }}
                       transition={{
                         duration: 0.6,
@@ -226,7 +233,11 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                   <motion.button
                     onClick={() => adjustRestTime(15)}
                     whileTap={{ scale: 0.95 }}
-                    className="flex-1 bg-pink-400/20 border border-pink-400/40 text-pink-300 py-2 px-3 font-bold text-sm uppercase tracking-wide hover:bg-pink-400/30 transition-colors flex items-center justify-center gap-1"
+                    className={`flex-1 py-2 px-3 font-bold text-sm uppercase tracking-wide transition-colors flex items-center justify-center gap-1 ${
+                      isDeload
+                        ? 'bg-cyan-400/20 border border-cyan-400/40 text-cyan-300 hover:bg-cyan-400/30'
+                        : 'bg-pink-400/20 border border-pink-400/40 text-pink-300 hover:bg-pink-400/30'
+                    }`}
                   >
                     <Minus className="w-4 h-4" strokeWidth={3} />
                     <span>15s</span>
@@ -242,7 +253,11 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                   <motion.button
                     onClick={() => adjustRestTime(-15)}
                     whileTap={{ scale: 0.95 }}
-                    className="flex-1 bg-pink-400/20 border border-pink-400/40 text-pink-300 py-2 px-3 font-bold text-sm uppercase tracking-wide hover:bg-pink-400/30 transition-colors flex items-center justify-center gap-1"
+                    className={`flex-1 py-2 px-3 font-bold text-sm uppercase tracking-wide transition-colors flex items-center justify-center gap-1 ${
+                      isDeload
+                        ? 'bg-cyan-400/20 border border-cyan-400/40 text-cyan-300 hover:bg-cyan-400/30'
+                        : 'bg-pink-400/20 border border-pink-400/40 text-pink-300 hover:bg-pink-400/30'
+                    }`}
                   >
                     <Plus className="w-4 h-4" strokeWidth={3} />
                     <span>15s</span>
@@ -268,6 +283,23 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* DELOAD BADGE */}
+          {isDeload && (
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="flex items-center gap-2 mb-3 px-3 py-2 bg-white/10 border border-white/20 rounded-lg"
+            >
+              <Zap className="w-4 h-4 text-cyan-300" strokeWidth={2.5} />
+              <span className="text-xs font-bold text-white uppercase tracking-wider">
+                Deload Mode
+              </span>
+              <span className="text-xs text-white/60">
+                {activeSession.deloadRepPercentage}% reps • {activeSession.deloadWeightPercentage}% weight
+              </span>
+            </motion.div>
+          )}
 
           {/* SECONDARY: Context info - smaller, consistent sizing */}
           <div className="flex items-center justify-between text-white/80 mb-3">

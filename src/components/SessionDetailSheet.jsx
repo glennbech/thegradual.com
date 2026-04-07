@@ -7,6 +7,7 @@ import {
   Dumbbell,
   BarChart3,
   Check,
+  Zap,
 } from 'lucide-react';
 import { headingStyles } from '../utils/typography';
 import SessionTimeline from './SessionTimeline';
@@ -85,13 +86,26 @@ export default function SessionDetailSheet({
                           year: 'numeric',
                         })}
                   </h2>
-                  <p className={headingStyles.label}>
-                    {new Date(session.completedAt || session.createdAt).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={headingStyles.label}>
+                      {new Date(session.completedAt || session.createdAt).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                    {session.isDeload && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-[#0D9488]/10 border border-[#0D9488]/30 rounded">
+                        <Zap className="w-3.5 h-3.5 text-[#0D9488]" strokeWidth={2.5} />
+                        <span className="text-xs font-bold text-[#0D9488] uppercase tracking-wider">
+                          Deload
+                        </span>
+                        <span className="text-xs text-mono-600">
+                          ({session.deloadRepPercentage}% reps • {session.deloadWeightPercentage}% weight)
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <motion.button
                   onClick={onClose}

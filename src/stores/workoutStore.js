@@ -9,6 +9,7 @@
 import { create } from 'zustand';
 import { saveUserState, fetchUserState, ConflictError } from '../services/apiClient';
 import { filterSessionsWithCompletedSets } from '../utils/progressCalculations';
+import { applyDeloadToExercises } from '../utils/deloadCalculations';
 
 const useWorkoutStore = create((set, get) => ({
       // ==========================================
@@ -20,6 +21,13 @@ const useWorkoutStore = create((set, get) => ({
       customTemplates: [],
       bodyMeasurements: [],
       restTimerDuration: 120, // Rest timer in seconds (default 2 minutes)
+
+      // Deload mode settings
+      deloadMode: false,
+      deloadRepsOnlyPercentage: 100,    // Percentage of reps for bodyweight exercises (60-100%)
+      deloadWeightedRepsPercentage: 100, // Percentage of reps for weighted exercises (60-100%)
+      deloadWeightPercentage: 100,       // Percentage of weight for weighted exercises (60-100%)
+
       isOnline: navigator.onLine,
       isLoading: false, // Track loading state for API operations
 
@@ -82,12 +90,27 @@ const useWorkoutStore = create((set, get) => ({
 
         set({ isLoading: true });
 
+        const state = get();
+        const { deloadMode, deloadRepsOnlyPercentage, deloadWeightedRepsPercentage, deloadWeightPercentage } = state;
+
+        // Apply deload if active
+        let processedExercises = exercises.map((ex) => ({
+          ...ex,
+          sets: ex.sets || [],
+        }));
+
+        if (deloadMode) {
+          processedExercises = applyDeloadToExercises(
+            processedExercises,
+            deloadRepsOnlyPercentage,
+            deloadWeightedRepsPercentage,
+            deloadWeightPercentage
+          );
+        }
+
         const newSession = {
           id: `session-${Date.now()}`,
-          exercises: exercises.map((ex) => ({
-            ...ex,
-            sets: ex.sets || [],
-          })),
+          exercises: processedExercises,
           startTime: Date.now(),
           createdAt: new Date().toISOString(),
           templateReference,
@@ -95,6 +118,13 @@ const useWorkoutStore = create((set, get) => ({
           currentExerciseIndex: 0,
           restStartTime: null,
           isResting: false,
+          // Tag deload sessions with percentages used
+          ...(deloadMode && {
+            isDeload: true,
+            deloadRepsOnlyPercentage,
+            deloadWeightedRepsPercentage,
+            deloadWeightPercentage,
+          }),
         };
 
         try {
@@ -333,7 +363,7 @@ const useWorkoutStore = create((set, get) => ({
       getPreviousSessionForExercise: (exerciseId) => {
         const sessions = get().sessions;
         const completedSessions = filterSessionsWithCompletedSets(sessions)
-          .filter((s) => s.status === 'completed')
+          .filter((s) => s.status === 'completed' && !s.isDeload) // Skip deload sessions
           .sort((a, b) => new Date(b.completedAt || b.endTime) - new Date(a.completedAt || a.endTime));
 
         for (const session of completedSessions) {
@@ -729,6 +759,73 @@ const useWorkoutStore = create((set, get) => ({
         return get().restTimerDuration;
       },
 
+      /**
+       * Update deload settings
+       * API-FIRST: Saves to DynamoDB before updating local state
+       */
+      setDeloadSettings: async (deloadMode, repsOnlyPct, weightedRepsPct, weightPct) => {
+        const { isOnline } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot update settings while offline');
+        }
+
+        // Validate percentages (60-100)
+        const validRepsOnlyPct = Math.max(60, Math.min(100, repsOnlyPct));
+        const validWeightedRepsPct = Math.max(60, Math.min(100, weightedRepsPct));
+        const validWeightPct = Math.max(60, Math.min(100, weightPct));
+
+        set({ isLoading: true });
+
+        try {
+          const state = get();
+          await state._saveWithVersion({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+            bodyMeasurements: state.bodyMeasurements,
+            restTimerDuration: state.restTimerDuration,
+            deloadMode,
+            deloadRepsOnlyPercentage: validRepsOnlyPct,
+            deloadWeightedRepsPercentage: validWeightedRepsPct,
+            deloadWeightPercentage: validWeightPct,
+          });
+
+          set({
+            deloadMode,
+            deloadRepsOnlyPercentage: validRepsOnlyPct,
+            deloadWeightedRepsPercentage: validWeightedRepsPct,
+            deloadWeightPercentage: validWeightPct,
+            isLoading: false,
+          });
+          console.log('[workoutStore] Deload settings updated:', {
+            deloadMode,
+            repsOnlyPct: validRepsOnlyPct,
+            weightedRepsPct: validWeightedRepsPct,
+            weightPct: validWeightPct
+          });
+          return {
+            deloadMode,
+            deloadRepsOnlyPercentage: validRepsOnlyPct,
+            deloadWeightedRepsPercentage: validWeightedRepsPct,
+            deloadWeightPercentage: validWeightPct
+          };
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to update deload settings:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Get deload settings
+       */
+      getDeloadSettings: () => {
+        const { deloadMode, deloadRepsOnlyPercentage, deloadWeightedRepsPercentage, deloadWeightPercentage } = get();
+        return { deloadMode, deloadRepsOnlyPercentage, deloadWeightedRepsPercentage, deloadWeightPercentage };
+      },
+
       // ==========================================
       // DATA LOADING & CONNECTION
       // ==========================================
@@ -769,6 +866,10 @@ const useWorkoutStore = create((set, get) => ({
               customTemplates: data.customTemplates || [],
               bodyMeasurements: data.bodyMeasurements || [],
               restTimerDuration: data.restTimerDuration || 120,
+              deloadMode: data.deloadMode || false,
+              deloadRepsOnlyPercentage: data.deloadRepsOnlyPercentage || 100,
+              deloadWeightedRepsPercentage: data.deloadWeightedRepsPercentage || 100,
+              deloadWeightPercentage: data.deloadWeightPercentage || 100,
               stateVersion: data.version || 1,
               lastModified: data.lastModified || null,
               isStale: false,
@@ -793,6 +894,10 @@ const useWorkoutStore = create((set, get) => ({
               customTemplates: [],
               bodyMeasurements: [],
               restTimerDuration: 120,
+              deloadMode: false,
+              deloadRepsOnlyPercentage: 100,
+              deloadWeightedRepsPercentage: 100,
+              deloadWeightPercentage: 100,
               stateVersion: 1,
               lastModified: null,
               isStale: false,

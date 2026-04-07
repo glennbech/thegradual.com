@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { awsConfig, getAuthorizeUrl } from '../config/aws';
-import { getUserId } from '../utils/userManager';
+import { awsConfig, getAuthorizeUrl, getLogoutUrl } from '../config/aws';
+import { getUserId, clearUserId } from '../utils/userManager';
 import useWorkoutStore from '../stores/workoutStore';
 
 const AuthContext = createContext(null);
@@ -294,7 +294,7 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      // Call BFF logout endpoint
+      // Call BFF logout endpoint to clear refresh token cookie
       await fetch(`${awsConfig.bffEndpoint}/auth/logout`, {
         method: 'POST',
         credentials: 'include' // Send cookies
@@ -306,14 +306,20 @@ export const AuthProvider = ({ children }) => {
       const workoutStore = useWorkoutStore.getState();
       workoutStore.clearCache();
 
-      // Clear auth token
+      // Clear ALL auth-related localStorage items
       localStorage.removeItem('idToken');
+      clearUserId(); // Clear thegradual_user_id
+      localStorage.removeItem('debug_last_login_attempt'); // Clear debug data
 
       // Clear auth state
       setUser(null);
       setIsAuthenticated(false);
 
       console.log('✅ Logout complete, cache cleared');
+
+      // Redirect to Cognito logout URL
+      // This logs out from Cognito AND Google OAuth, then redirects back
+      window.location.assign(getLogoutUrl());
     }
   };
 

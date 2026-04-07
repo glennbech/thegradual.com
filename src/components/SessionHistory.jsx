@@ -14,6 +14,7 @@ import {
   Clock,
   MoreHorizontal,
   Check,
+  Zap,
 } from 'lucide-react';
 import { scaleIn } from '../utils/animations';
 import useWorkoutStore from '../stores/workoutStore';
@@ -379,8 +380,8 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
               className="bg-white border-2 border-mono-900 overflow-hidden hover:border-mono-700 transition-colors relative cursor-pointer"
               onClick={() => handleOpenSession(session)}
             >
-              {/* Black Header Bar */}
-              <div className="bg-mono-900 px-4 py-3">
+              {/* Header Bar - Black or Teal for deload */}
+              <div className={`px-4 py-3 ${session.isDeload ? 'bg-[#0D9488]' : 'bg-mono-900'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     {session.templateReference ? (
@@ -396,6 +397,14 @@ export default function SessionHistory({ onDoItAgain, initialExpandedSessionId, 
                       </h4>
                     )}
                   </div>
+                  {session.isDeload && (
+                    <div className="flex items-center gap-1.5 ml-2 px-2 py-1 bg-white/10 border border-white/20 rounded">
+                      <Zap className="w-3.5 h-3.5 text-cyan-300" strokeWidth={2.5} />
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">
+                        Deload
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
