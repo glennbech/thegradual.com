@@ -4,7 +4,8 @@ import useWorkoutStore from '../stores/workoutStore';
 
 /**
  * ConflictModal - Displays when version conflict is detected
- * Forces user to reload to get latest data before making changes
+ * Appears only after automatic retry has failed
+ * Provides options to reload data or dismiss (at user's risk)
  */
 export default function ConflictModal() {
   const isStale = useWorkoutStore((state) => state.isStale);
@@ -17,8 +18,13 @@ export default function ConflictModal() {
       // isStale will be set to false by loadFromAPI on success
     } catch (error) {
       console.error('Failed to reload:', error);
-      // Keep modal open if reload fails
+      alert('Failed to reload data. Please check your connection and try again.');
     }
+  };
+
+  const handleDismiss = () => {
+    // Dismiss modal (risky - user might overwrite newer data)
+    useWorkoutStore.setState({ isStale: false, conflictMessage: null });
   };
 
   return (
@@ -55,21 +61,34 @@ export default function ConflictModal() {
               <div className="px-6 py-6">
                 <div className="space-y-4">
                   <p className="text-mono-700 leading-relaxed">
-                    Your data was modified on another device or browser.
+                    Your data was modified on another device or browser tab. The app attempted to automatically sync, but the conflict persists.
                   </p>
-                  <p className="text-mono-700 leading-relaxed">
-                    {conflictMessage || 'Please reload to get the latest version before making changes.'}
+                  <p className="text-mono-700 leading-relaxed text-sm">
+                    {conflictMessage || 'This usually happens when using multiple devices simultaneously.'}
                   </p>
-                  <div className="bg-mono-100 border-l-4 border-orange-500 p-4 rounded">
-                    <p className="text-sm text-mono-600 font-medium">
-                      <strong>Note:</strong> Your current unsaved changes cannot be saved and will be lost when you reload.
+                  <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded">
+                    <p className="text-sm text-mono-700 font-medium">
+                      <strong>Recommended:</strong> Reload data to get the latest version. Recent unsaved changes (within last 1.5 seconds) may be lost.
+                    </p>
+                  </div>
+                  <div className="bg-mono-100 border-l-4 border-mono-300 p-4 rounded">
+                    <p className="text-xs text-mono-600">
+                      <strong>Advanced:</strong> You can dismiss this warning and continue, but your next save might fail or overwrite newer data.
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="px-6 py-4 bg-mono-50 border-t border-mono-200 flex justify-end gap-3">
+              <div className="px-6 py-4 bg-mono-50 border-t border-mono-200 flex justify-between gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDismiss}
+                  className="px-4 py-3 rounded font-bold uppercase tracking-wide text-mono-600 hover:text-mono-900 hover:bg-mono-200 transition-colors text-sm"
+                >
+                  Dismiss
+                </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}

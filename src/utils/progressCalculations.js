@@ -131,7 +131,8 @@ export function getExerciseStats(exerciseId, sessions, exerciseDefinition = null
         maxDuration: sessionMaxDuration,
         totalDuration: sessionTotalDuration,
         sets: completedSets.length, // Only count completed sets
-        exercise: exerciseInSession
+        exercise: exerciseInSession,
+        isDeload: session.isDeload || false
       });
 
       // Update overall stats

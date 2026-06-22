@@ -21,6 +21,7 @@ import ConfirmDialog from './ConfirmDialog';
 import ExerciseDetailModal from './ExerciseDetailModal';
 import ExerciseVictoryScreen from './ExerciseVictoryScreen';
 import { analyzeExercisePerformance } from '../utils/exerciseStats';
+import VolumeProgressBar from './VolumeProgressBar';
 
 export default function ExerciseLogger({
   exercises,
@@ -364,6 +365,24 @@ export default function ExerciseLogger({
     }
   };
 
+  const handleDeleteAllSets = (exerciseIndex) => {
+    const exercise = activeSession?.exercises[exerciseIndex];
+    if (!exercise || exercise.sets.length === 0) return;
+
+    // Remove the entire exercise from the workout (not just clear sets)
+    const updatedExercises = activeSession.exercises.filter((_, i) => i !== exerciseIndex);
+
+    // Adjust currentExerciseIndex if needed
+    const newCurrentIndex = exerciseIndex >= updatedExercises.length
+      ? Math.max(0, updatedExercises.length - 1)
+      : activeSession.currentExerciseIndex;
+
+    updateActiveSession({
+      exercises: updatedExercises,
+      currentExerciseIndex: newCurrentIndex
+    });
+  };
+
   const handleStartEditSet = (exerciseIndex, setIndex) => {
     const exercise = activeSession?.exercises[exerciseIndex];
     if (!exercise) return;
@@ -605,14 +624,30 @@ export default function ExerciseLogger({
                   >
                     {exercise.name}
                   </h2>
+
+                  {/* Volume Progress Bar */}
+                  <VolumeProgressBar
+                    currentExercise={exercise}
+                    previousExercise={getPreviousSessionForExercise(exercise.id)}
+                    muscleColor={getMuscleColor(exercise.category)}
+                  />
                 </div>
               </div>
             </div>
 
             {/* Sets List */}
             <div className="space-y-3">
-              <h3 className={`${headingStyles.h3} flex items-center gap-2`}>
-                Sets ({exercise.sets.filter(s => s.completed !== false).length}/{exercise.sets.length})
+              <h3 className={`${headingStyles.h3} flex items-center justify-between`}>
+                <span>Sets ({exercise.sets.filter(s => s.completed !== false).length}/{exercise.sets.length})</span>
+                {exercise.sets.length > 0 && (
+                  <motion.button
+                    onClick={() => handleDeleteAllSets(exerciseIndex)}
+                    whileTap={{ scale: 0.95 }}
+                    className="text-xs uppercase tracking-wide text-mono-500 hover:text-red-500 transition-colors font-medium"
+                  >
+                    Clear All
+                  </motion.button>
+                )}
               </h3>
               <div className="space-y-2">
                 {exercise.sets.map((set, setIndex) => (

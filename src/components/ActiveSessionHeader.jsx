@@ -30,7 +30,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
     // To subtract time: move restStartTime forward (add milliseconds)
     // Positive seconds = add time to timer (move start back)
     // Negative seconds = subtract time from timer (move start forward)
-    const newRestStartTime = activeSession.restStartTime + (seconds * 1000);
+    const newRestStartTime = activeSession.restStartTime - (seconds * 1000);
 
     updateActiveSession({
       restStartTime: newRestStartTime
@@ -296,7 +296,7 @@ export default function ActiveSessionHeader({ onNavigateToLogger, onDiscard, cur
                 Deload Mode
               </span>
               <span className="text-xs text-white/60">
-                {activeSession.deloadRepPercentage}% reps • {activeSession.deloadWeightPercentage}% weight
+                {activeSession.deloadWeightedRepsPercentage}% reps • {activeSession.deloadWeightPercentage}% weight
               </span>
             </motion.div>
           )}

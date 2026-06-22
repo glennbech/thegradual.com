@@ -101,7 +101,7 @@ export default function SessionDetailSheet({
                           Deload
                         </span>
                         <span className="text-xs text-mono-600">
-                          ({session.deloadRepPercentage}% reps • {session.deloadWeightPercentage}% weight)
+                          ({session.deloadWeightedRepsPercentage}% reps • {session.deloadWeightPercentage}% weight)
                         </span>
                       </div>
                     )}

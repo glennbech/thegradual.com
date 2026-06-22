@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Play, X, Clock, Target, Sparkles, Trash2, ChevronDown, ChevronUp, Dumbbell, Edit2 } from 'lucide-react'
+import { Plus, Play, X, Clock, Target, Sparkles, Trash2, ChevronDown, ChevronUp, Dumbbell, Edit2, ChevronRight } from 'lucide-react'
 import { staggerContainer, staggerItem } from '../utils/animations'
 import { headingStyles, iconSizes } from '../utils/typography'
 import { getMuscleColor } from '../utils/design-system'
@@ -198,33 +198,42 @@ export default function SessionPlanner({ onStartSession, onEditTemplate }) {
                                 variants={staggerItem}
                                 exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
                                 layout
-                                className="card-flat p-6 hover:border-mono-400 transition-colors relative cursor-pointer min-h-[220px] flex flex-col"
+                                className="card-flat p-6 hover:border-mono-900 hover:shadow-lg transition-all relative cursor-pointer min-h-[180px] flex flex-col group"
                                 onClick={() => handleShowWorkoutPreview(template)}
                               >
-                                <div className="bg-mono-900 px-4 py-3 -m-6 mb-4">
+                                {/* Clickable title with arrow indicator */}
+                                <div className="bg-mono-900 group-hover:bg-mono-800 px-4 py-3 -m-6 mb-4 flex items-center justify-between transition-colors">
                                   <h4 className="text-white font-bold text-lg uppercase tracking-tight">
                                     {template.name}
                                   </h4>
+                                  <ChevronRight className="w-5 h-5 text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all" strokeWidth={2} />
                                 </div>
 
-                                <p className="text-sm text-mono-600 mb-4 line-clamp-2 px-1">
+                                <p className="text-sm text-mono-600 mb-3 line-clamp-2 px-1">
                                   {template.description}
                                 </p>
 
+                                {/* Muscle groups - informational list */}
                                 {muscleGroups.length > 0 && (
-                                  <div className="flex flex-wrap gap-2 mb-4 px-1">
-                                    {muscleGroups.map(group => (
-                                      <span
-                                        key={group}
-                                        className="px-2 py-1 text-xs font-bold uppercase tracking-wide border-2 border-mono-900 text-mono-900"
-                                        style={{ borderColor: getMuscleColor(group), color: getMuscleColor(group) }}
-                                      >
-                                        {group}
-                                      </span>
-                                    ))}
+                                  <div className="mb-4 px-1">
+                                    <p className="text-xs text-mono-500 mb-1">
+                                      Exercises cover:{' '}
+                                      {muscleGroups.map((group, idx) => (
+                                        <span key={group}>
+                                          <span
+                                            className="font-medium uppercase"
+                                            style={{ color: getMuscleColor(group) }}
+                                          >
+                                            {group}
+                                          </span>
+                                          {idx < muscleGroups.length - 1 && <span className="text-mono-400"> • </span>}
+                                        </span>
+                                      ))}
+                                    </p>
                                   </div>
                                 )}
 
+                                {/* Stats footer */}
                                 <div className="flex items-center justify-between border-t-2 border-mono-200 pt-3 mt-auto">
                                   <div className="flex items-center gap-2">
                                     <Clock className="w-5 h-5 text-mono-600" strokeWidth={2} />
@@ -251,20 +260,6 @@ export default function SessionPlanner({ onStartSession, onEditTemplate }) {
                                     Edit
                                   </motion.button>
                                 </div>
-
-                                <div className="absolute top-2 right-2">
-                                  <motion.button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteTemplate(template, e);
-                                    }}
-                                    whileTap={{ scale: 0.9 }}
-                                    className="p-1.5 bg-white/80 hover:bg-white text-mono-600 hover:text-red-600 transition-colors"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </motion.button>
-                                </div>
                               </motion.div>
                             )
                           })}
@@ -280,36 +275,42 @@ export default function SessionPlanner({ onStartSession, onEditTemplate }) {
                             <motion.div
                               key={template.id}
                               variants={staggerItem}
-                              className="card-flat p-6 hover:border-mono-400 transition-colors cursor-pointer relative min-h-[200px]"
+                              className="card-flat p-6 hover:border-mono-900 hover:shadow-lg transition-all cursor-pointer relative min-h-[180px] flex flex-col group"
                               onClick={() => handleShowWorkoutPreview(template)}
                             >
-                              {/* Prominent Title - Black background, white text */}
-                              <div className="bg-mono-900 px-4 py-3 -m-6 mb-4">
+                              {/* Clickable title with arrow indicator */}
+                              <div className="bg-mono-900 group-hover:bg-mono-800 px-4 py-3 -m-6 mb-4 flex items-center justify-between transition-colors">
                                 <h4 className="text-white font-bold text-lg uppercase tracking-tight">
                                   {template.name}
                                 </h4>
+                                <ChevronRight className="w-5 h-5 text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all" strokeWidth={2} />
                               </div>
 
-                              <p className="text-sm text-mono-600 mb-4 line-clamp-2 px-1">
+                              <p className="text-sm text-mono-600 mb-3 line-clamp-2 px-1">
                                 {template.description}
                               </p>
 
-                              {/* Muscle Groups */}
+                              {/* Muscle groups - informational list */}
                               {muscleGroups.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-4 px-1">
-                                  {muscleGroups.map(group => (
-                                    <span
-                                      key={group}
-                                      className="px-2 py-1 text-xs font-bold uppercase tracking-wide border-2 border-mono-900 text-mono-900"
-                                      style={{ borderColor: getMuscleColor(group), color: getMuscleColor(group) }}
-                                    >
-                                      {group}
-                                    </span>
-                                  ))}
+                                <div className="mb-4 px-1">
+                                  <p className="text-xs text-mono-500 mb-1">
+                                    Exercises cover:{' '}
+                                    {muscleGroups.map((group, idx) => (
+                                      <span key={group}>
+                                        <span
+                                          className="font-medium uppercase"
+                                          style={{ color: getMuscleColor(group) }}
+                                        >
+                                          {group}
+                                        </span>
+                                        {idx < muscleGroups.length - 1 && <span className="text-mono-400"> • </span>}
+                                      </span>
+                                    ))}
+                                  </p>
                                 </div>
                               )}
 
-                              {/* Metadata - Aligned horizontally */}
+                              {/* Stats footer */}
                               <div className="flex items-center justify-between border-t-2 border-mono-200 pt-3 mt-auto">
                                 <div className="flex items-center gap-2">
                                   <Clock className="w-5 h-5 text-mono-600" strokeWidth={2} />

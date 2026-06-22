@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Sparkles } from 'lucide-react';
+import { TrendingUp, Sparkles, Clock } from 'lucide-react';
 import useWorkoutStore from '../stores/workoutStore';
 import { getMuscleColor } from '../utils/design-system';
 import {
@@ -15,7 +15,6 @@ import {
   getExerciseStats,
   calculateTrend
 } from '../utils/progressCalculations';
-import { getWorkoutInsights } from '../services/apiClient';
 import StrengthChart from './StrengthChart';
 import ExerciseProgressCard from './ExerciseProgressCard';
 import ExerciseProgressDetail from './ExerciseProgressDetail';
@@ -27,16 +26,11 @@ import defaultExercises from '../data/exercises.json';
  * Analyze component - Scientific strength metrics and analytics
  */
 export default function Analyze({ onNavigateToSession }) {
-  const { sessions } = useWorkoutStore();
+  const { sessions, dailyInsights, lastAnalyzed } = useWorkoutStore();
   const [expandedExerciseId, setExpandedExerciseId] = useState(null);
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [selectedStats, setSelectedStats] = useState(null);
-
-  // AI Insights state
   const [showInsightsModal, setShowInsightsModal] = useState(false);
-  const [insights, setInsights] = useState(null);
-  const [insightsLoading, setInsightsLoading] = useState(false);
-  const [insightsError, setInsightsError] = useState(null);
 
   // Handle session click - navigate to history with selected session
   const handleSessionClick = (sessionId) => {
@@ -88,12 +82,20 @@ export default function Analyze({ onNavigateToSession }) {
   }, [sessions, exercisesWithStandards]);
 
   // Get exercises that have been performed (for exercise progress cards)
+  // Only show exercises with 5+ sessions
   const performedExercises = useMemo(() => {
     if (!sessions || sessions.length === 0) return [];
     const completedSessions = sessions.filter(s => s.status === 'completed');
     const performedIds = getPerformedExercises(completedSessions);
     return performedIds
-      .map(id => exercises.find(ex => ex.id === id))
+      .map(id => {
+        const exercise = exercises.find(ex => ex.id === id);
+        if (!exercise) return null;
+
+        // Count sessions for this exercise
+        const stats = getExerciseStats(id, completedSessions, exercise);
+        return stats.sessionCount >= 5 ? exercise : null;
+      })
       .filter(Boolean);
   }, [sessions, exercises]);
 
@@ -109,36 +111,18 @@ export default function Analyze({ onNavigateToSession }) {
     setSelectedStats(null);
   };
 
-  // Handle AI insights request
-  const handleGetInsights = async () => {
-    setShowInsightsModal(true);
-    setInsightsLoading(true);
-    setInsightsError(null);
-    setInsights(null);
+  // Format timestamp for display
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
-    try {
-      // Get complete user state from store
-      const workoutState = useWorkoutStore.getState();
-      const userData = {
-        sessions: workoutState.sessions,
-        customExercises: workoutState.customExercises,
-        customTemplates: workoutState.customTemplates,
-        activeSession: workoutState.activeSession,
-        bodyMeasurements: workoutState.bodyMeasurements || []
-      };
-
-      const result = await getWorkoutInsights(userData);
-      setInsights(result);
-    } catch (error) {
-      console.error('Error fetching insights:', error);
-      setInsightsError(error.message || 'Failed to get workout insights. Please try again.');
-    } finally {
-      setInsightsLoading(false);
-    }
-  };
-
-  const handleCloseInsightsModal = () => {
-    setShowInsightsModal(false);
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffHours < 48) return 'Yesterday';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   // Expandable card for exercise details
@@ -382,25 +366,89 @@ export default function Analyze({ onNavigateToSession }) {
         </p>
       </div>
 
-      {/* AI Insights Button */}
+      {/* Daily Insights */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <button
-          onClick={handleGetInsights}
-          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 group"
-        >
-          <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-          <span className="uppercase tracking-wide text-lg">Get AI Insights</span>
-          <div className="bg-white/20 px-2 py-1 rounded text-xs uppercase">
-            Claude 3.5
+        {dailyInsights ? (
+          // Show insights when available
+          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-600 p-2 rounded-lg">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-mono-900 uppercase tracking-tight">
+                    Insights
+                  </h2>
+                  <p className="text-xs text-mono-500 uppercase tracking-wide">
+                    Powered by Claude 3.5 Sonnet
+                  </p>
+                </div>
+              </div>
+              {lastAnalyzed && (
+                <div className="flex items-center gap-2 text-xs text-mono-500">
+                  <Clock className="w-4 h-4" />
+                  <span className="uppercase tracking-wide">{formatTimestamp(lastAnalyzed)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Summary */}
+            {dailyInsights.summary && (
+              <p className="text-mono-700 leading-relaxed mb-4">
+                {dailyInsights.summary}
+              </p>
+            )}
+
+            {/* Top Priority Recommendation */}
+            {dailyInsights.recommendations && dailyInsights.recommendations.length > 0 && (
+              <div className="bg-white border-l-4 border-orange-500 rounded-r-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <div className="px-2 py-1 rounded text-xs font-bold uppercase tracking-wide border border-orange-600 text-orange-600 bg-orange-50">
+                    {dailyInsights.recommendations[0].priority || 'priority'}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-mono-900 mb-1">
+                      {dailyInsights.recommendations[0].title}
+                    </h3>
+                    <p className="text-mono-700 text-sm">{dailyInsights.recommendations[0].message}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* View All Insights Button */}
+            <button
+              onClick={() => setShowInsightsModal(true)}
+              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold uppercase tracking-wide rounded hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-5 h-5" />
+              View All Insights
+            </button>
           </div>
-        </button>
-        <p className="text-center text-xs text-mono-500 mt-2 uppercase tracking-wide">
-          AI-powered analysis based on peer-reviewed hypertrophy research
-        </p>
+        ) : (
+          // Show placeholder when no insights yet
+          <div className="bg-mono-100 border-2 border-mono-200 rounded-lg p-6 text-center">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="bg-mono-300 p-2 rounded-lg">
+                <Sparkles className="w-6 h-6 text-mono-600" />
+              </div>
+              <h2 className="text-xl font-bold text-mono-900 uppercase tracking-tight">
+                Insights
+              </h2>
+            </div>
+            <p className="text-mono-600 text-sm">
+              Your personalized insights will appear here after the daily analysis runs at midnight CET.
+            </p>
+            <p className="text-mono-500 text-xs mt-2 uppercase tracking-wide">
+              Powered by Claude 3.5 Sonnet
+            </p>
+          </div>
+        )}
       </motion.div>
 
       {/* Exercise Progress Section */}
@@ -506,13 +554,13 @@ export default function Analyze({ onNavigateToSession }) {
         />
       )}
 
-      {/* AI Insights Modal */}
+      {/* Insights Modal */}
       <InsightsModal
         isOpen={showInsightsModal}
-        onClose={handleCloseInsightsModal}
-        insights={insights}
-        loading={insightsLoading}
-        error={insightsError}
+        onClose={() => setShowInsightsModal(false)}
+        insights={dailyInsights}
+        loading={false}
+        error={null}
       />
     </motion.div>
   );

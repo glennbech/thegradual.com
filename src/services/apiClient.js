@@ -72,6 +72,15 @@ export async function fetchUserState() {
       customTemplates: JSON.parse(data.customTemplates || '[]'),
       activeSession: JSON.parse(data.activeSession || 'null'),
       bodyMeasurements: JSON.parse(data.bodyMeasurements || '[]'),
+      dailyInsights: JSON.parse(data.dailyInsights || 'null'),  // AI insights from daily batch
+      lastAnalyzed: data.lastAnalyzed || null,  // Timestamp of last AI analysis
+      restTimerDuration: data.restTimerDuration || 120,
+      deloadMode: data.deloadMode || false,
+      deloadRepsOnlyPercentage: data.deloadRepsOnlyPercentage || 100,
+      deloadWeightedRepsPercentage: data.deloadWeightedRepsPercentage || 100,
+      deloadWeightPercentage: data.deloadWeightPercentage || 100,
+      age: data.age || 0,
+      trainingGoal: data.trainingGoal || '',
       lastUpdated: data.lastUpdated,
     };
 
@@ -94,6 +103,13 @@ export async function fetchUserState() {
         customTemplates: [],
         activeSession: null,
         bodyMeasurements: [],
+        restTimerDuration: 120,
+        deloadMode: false,
+        deloadRepsOnlyPercentage: 100,
+        deloadWeightedRepsPercentage: 100,
+        deloadWeightPercentage: 100,
+        age: 0,
+        trainingGoal: '',
         lastUpdated: '',
       };
     }
@@ -133,6 +149,13 @@ export async function saveUserState(state) {
     customTemplates: JSON.stringify(state.customTemplates || []),
     activeSession: JSON.stringify(state.activeSession || null),
     bodyMeasurements: JSON.stringify(state.bodyMeasurements || []),
+    restTimerDuration: state.restTimerDuration || 120,
+    deloadMode: state.deloadMode || false,
+    deloadRepsOnlyPercentage: state.deloadRepsOnlyPercentage || 100,
+    deloadWeightedRepsPercentage: state.deloadWeightedRepsPercentage || 100,
+    deloadWeightPercentage: state.deloadWeightPercentage || 100,
+    age: state.age || 0,
+    trainingGoal: state.trainingGoal || '',
     lastUpdated: new Date().toISOString(),
   };
 
@@ -216,6 +239,8 @@ export async function getWorkoutInsights(userData) {
   }
 
   // Lambda Function URL (from Terraform output)
+  // To configure: Create .env file with VITE_INSIGHTS_API_URL=<your-lambda-url>
+  // Get URL from: cd infra && terraform output workout_insights_lambda_url
   const INSIGHTS_API_URL = import.meta.env.VITE_INSIGHTS_API_URL ||
     'https://b255hnwm4mwqcksxqwtwftc6rq0ggzwy.lambda-url.us-east-2.on.aws/';
 

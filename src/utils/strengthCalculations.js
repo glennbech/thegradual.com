@@ -92,7 +92,8 @@ export function getE1RMProgression(sessions, exerciseId) {
       progression.push({
         date: session.completedAt || session.createdAt,
         e1rm: bestE1RM.average,
-        sessionId: session.id
+        sessionId: session.id,
+        isDeload: session.isDeload || false
       });
     }
   });

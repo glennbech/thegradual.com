@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, ListChecks, Save, ChevronUp, ChevronDown, X, GripVertical } from 'lucide-react'
 import { staggerContainer, staggerItem, pageTransition } from '../utils/animations'
 import { getMuscleColor } from '../utils/design-system'
+import { applyDeloadToSet } from '../utils/deloadCalculations'
 import ExerciseCard from './ExerciseCard'
 import CreateExerciseCard from './CreateExerciseCard'
 import ExerciseAddedToast from './ExerciseAddedToast'
@@ -13,9 +14,14 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
   const deleteCustomExercise = useWorkoutStore((state) => state.deleteCustomExercise)
   const addCustomTemplate = useWorkoutStore((state) => state.addCustomTemplate)
   const updateCustomTemplate = useWorkoutStore((state) => state.updateCustomTemplate)
+  const deleteCustomTemplate = useWorkoutStore((state) => state.deleteCustomTemplate)
   const activeSession = useWorkoutStore((state) => state.activeSession)
   const updateActiveSession = useWorkoutStore((state) => state.updateActiveSession)
   const getPreviousSessionForExercise = useWorkoutStore((state) => state.getPreviousSessionForExercise)
+  const deloadMode = useWorkoutStore((state) => state.deloadMode)
+  const deloadRepsOnlyPercentage = useWorkoutStore((state) => state.deloadRepsOnlyPercentage)
+  const deloadWeightedRepsPercentage = useWorkoutStore((state) => state.deloadWeightedRepsPercentage)
+  const deloadWeightPercentage = useWorkoutStore((state) => state.deloadWeightPercentage)
 
   const [exercises, setExercises] = useState([])
   const [selectedExercises, setSelectedExercises] = useState([])
@@ -25,6 +31,8 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
   const [exerciseToDelete, setExerciseToDelete] = useState(null)
   const [showWorkoutPanel, setShowWorkoutPanel] = useState(false) // Start collapsed
   const [showSaveModal, setShowSaveModal] = useState(false)
+  const [showDeleteTemplateConfirm, setShowDeleteTemplateConfirm] = useState(false)
+  const [templateToDelete, setTemplateToDelete] = useState(null)
   const [templateForm, setTemplateForm] = useState({
     name: '',
     description: '',
@@ -133,6 +141,19 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
         }
       }
 
+      // Apply deload if active
+      if (deloadMode) {
+        defaultSets = defaultSets.map((set) =>
+          applyDeloadToSet(
+            set,
+            exerciseType,
+            deloadRepsOnlyPercentage,
+            deloadWeightedRepsPercentage,
+            deloadWeightPercentage
+          )
+        )
+      }
+
       const newExercise = {
         ...exercise,
         sets: defaultSets
@@ -156,7 +177,7 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
 
     // No active session - use normal plan builder behavior
     if (!selectedExercises.find(e => e.id === exercise.id)) {
-      const newSelectedExercises = [...selectedExercises, exercise]
+      const newSelectedExercises = [exercise, ...selectedExercises]
       setSelectedExercises(newSelectedExercises)
 
       // Auto-expand panel when adding first exercise
@@ -186,6 +207,27 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
     } catch (error) {
       console.error('Failed to delete exercise:', error)
       alert('Failed to delete exercise. Please try again.')
+    }
+  }
+
+  const handleConfirmDeleteTemplate = async () => {
+    if (!templateToDelete) return
+
+    try {
+      await deleteCustomTemplate(templateToDelete.id)
+      setShowDeleteTemplateConfirm(false)
+      setTemplateToDelete(null)
+      setIsEditing(false)
+      setSelectedExercises([])
+      setShowWorkoutPanel(false)
+
+      // Call onEditComplete to clear editTemplate in parent
+      if (onEditComplete) {
+        onEditComplete()
+      }
+    } catch (error) {
+      console.error('Failed to delete template:', error)
+      alert('Failed to delete template. Please try again.')
     }
   }
 
@@ -602,6 +644,24 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
                 </div>
               </div>
 
+              {/* Delete button for editing mode */}
+              {isEditing && editTemplate && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setShowSaveModal(false)
+                    setTemplateToDelete(editTemplate)
+                    setShowDeleteTemplateConfirm(true)
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-3 font-medium transition-colors uppercase tracking-wide flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Workout
+                </motion.button>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <motion.button
                   type="button"
@@ -662,6 +722,49 @@ export default function Plan({ onStartSession, editTemplate, onEditComplete, onN
               </button>
               <button
                 onClick={handleConfirmDeleteExercise}
+                className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold uppercase tracking-wide hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Delete Template Confirmation Modal */}
+      {showDeleteTemplateConfirm && templateToDelete && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowDeleteTemplateConfirm(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white border-4 border-mono-900 p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-mono-900 mb-2 uppercase tracking-tight">
+              Delete Workout?
+            </h3>
+            <p className="text-mono-900 font-semibold mb-2">
+              {templateToDelete.name}
+            </p>
+            <p className="text-mono-600 mb-6">
+              This will permanently delete this workout template. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteTemplateConfirm(false)}
+                className="flex-1 px-4 py-2 bg-white border-2 border-mono-900 text-mono-900 font-semibold uppercase tracking-wide hover:bg-mono-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteTemplate}
                 className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold uppercase tracking-wide hover:bg-red-700 transition-colors"
               >
                 Delete

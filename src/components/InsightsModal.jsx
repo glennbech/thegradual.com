@@ -23,17 +23,37 @@ export default function InsightsModal({ isOpen, onClose, insights, loading, erro
     }
   };
 
-  // Color mapping for insight types
-  const getInsightColor = (type) => {
+  // Color mapping for insight types (static classes for Tailwind)
+  const getInsightClasses = (type) => {
     switch (type) {
       case 'progress':
-        return 'emerald';
+        return {
+          bg: 'bg-emerald-50',
+          border: 'border-emerald-600',
+          text: 'text-emerald-600',
+          badge: 'bg-emerald-100 text-emerald-700'
+        };
       case 'warning':
-        return 'orange';
+        return {
+          bg: 'bg-orange-50',
+          border: 'border-orange-600',
+          text: 'text-orange-600',
+          badge: 'bg-orange-100 text-orange-700'
+        };
       case 'info':
-        return 'cyan';
+        return {
+          bg: 'bg-cyan-50',
+          border: 'border-cyan-600',
+          text: 'text-cyan-600',
+          badge: 'bg-cyan-100 text-cyan-700'
+        };
       default:
-        return 'purple';
+        return {
+          bg: 'bg-purple-50',
+          border: 'border-purple-600',
+          text: 'text-purple-600',
+          badge: 'bg-purple-100 text-purple-700'
+        };
     }
   };
 
@@ -173,17 +193,17 @@ export default function InsightsModal({ isOpen, onClose, insights, loading, erro
                       </h3>
                       <div className="space-y-3">
                         {insights.insights.map((insight, index) => {
-                          const color = getInsightColor(insight.type);
+                          const classes = getInsightClasses(insight.type);
                           return (
                             <motion.div
                               key={index}
                               initial={{ opacity: 0, x: -20 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: index * 0.1 }}
-                              className={`bg-${color}-50 border-l-4 border-${color}-600 rounded-r-lg p-4`}
+                              className={`${classes.bg} border-l-4 ${classes.border} rounded-r-lg p-4`}
                             >
                               <div className="flex items-start gap-3">
-                                <div className={`text-${color}-600 mt-0.5`}>
+                                <div className={`${classes.text} mt-0.5`}>
                                   {getInsightIcon(insight.type)}
                                 </div>
                                 <div className="flex-1">
@@ -192,7 +212,7 @@ export default function InsightsModal({ isOpen, onClose, insights, loading, erro
                                   </h4>
                                   <p className="text-mono-700 text-sm">{insight.message}</p>
                                   {insight.category && (
-                                    <div className={`inline-block mt-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-${color}-100 text-${color}-700`}>
+                                    <div className={`inline-block mt-2 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${classes.badge}`}>
                                       {insight.category}
                                     </div>
                                   )}

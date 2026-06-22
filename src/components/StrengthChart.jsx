@@ -42,7 +42,8 @@ export default function StrengthChart({
         x: (i / (validData.length - 1 || 1)) * 100,
         y: 100 - ((d[valueField] - yMin) / yRange) * 100,
         value: d[valueField],
-        date: d.date
+        date: d.date,
+        isDeload: d.isDeload || false
       })),
       yMin,
       yMax,
@@ -115,7 +116,7 @@ export default function StrengthChart({
               cy={point.y}
               r="2"
               fill="white"
-              stroke={color}
+              stroke={point.isDeload ? '#9CA3AF' : color}
               strokeWidth="2"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -135,9 +136,12 @@ export default function StrengthChart({
             >
               {/* Tooltip */}
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                <div className="bg-white border-2 rounded px-2 py-1 text-xs whitespace-nowrap shadow-md" style={{ borderColor: color }}>
+                <div className="bg-white border-2 rounded px-2 py-1 text-xs whitespace-nowrap shadow-md" style={{ borderColor: point.isDeload ? '#9CA3AF' : color }}>
                   <div className="font-semibold text-mono-900">{formatValue(point.value)}</div>
                   <div className="text-mono-500">{new Date(point.date).toLocaleDateString()}</div>
+                  {point.isDeload && (
+                    <div className="text-xs text-[#9CA3AF] font-bold uppercase mt-0.5">Deload</div>
+                  )}
                 </div>
               </div>
             </div>

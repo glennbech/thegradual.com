@@ -11,6 +11,13 @@ import { saveUserState, fetchUserState, ConflictError } from '../services/apiCli
 import { filterSessionsWithCompletedSets } from '../utils/progressCalculations';
 import { applyDeloadToExercises } from '../utils/deloadCalculations';
 
+// ==========================================
+// DEBOUNCE CONFIGURATION
+// ==========================================
+// Debounce timer for updateActiveSession to batch rapid updates
+let syncDebounceTimer = null;
+const SYNC_DEBOUNCE_MS = 1500; // 1.5 seconds - wait for user to stop making changes
+
 const useWorkoutStore = create((set, get) => ({
       // ==========================================
       // STATE
@@ -28,6 +35,14 @@ const useWorkoutStore = create((set, get) => ({
       deloadWeightedRepsPercentage: 100, // Percentage of reps for weighted exercises (60-100%)
       deloadWeightPercentage: 100,       // Percentage of weight for weighted exercises (60-100%)
 
+      // AI insights from daily batch
+      dailyInsights: null,
+      lastAnalyzed: null,
+
+      // User profile (passed to AI coach for personalized recommendations)
+      age: 0,
+      trainingGoal: '',
+
       isOnline: navigator.onLine,
       isLoading: false, // Track loading state for API operations
 
@@ -42,15 +57,24 @@ const useWorkoutStore = create((set, get) => ({
       // ==========================================
 
       /**
-       * Save state with version tracking and conflict handling
+       * Save state with version tracking, conflict handling, and automatic retry
+       * IMPORTANT: Always include dailyInsights and lastAnalyzed to prevent data loss
        * @private
+       * @param {Object} stateToSave - State data to save
+       * @param {number} retries - Number of retry attempts remaining (default: 1)
        */
-      _saveWithVersion: async (stateToSave) => {
+      _saveWithVersion: async (stateToSave, retries = 1) => {
         const state = get();
         try {
           const result = await saveUserState({
             version: state.stateVersion,
+            // Defaults from state — callers can override via stateToSave (e.g. setUserProfile)
+            age: state.age,
+            trainingGoal: state.trainingGoal,
             ...stateToSave,
+            // CRITICAL: Always preserve AI insights when saving state
+            dailyInsights: state.dailyInsights,
+            lastAnalyzed: state.lastAnalyzed,
           });
 
           // Update version after successful save
@@ -61,15 +85,32 @@ const useWorkoutStore = create((set, get) => ({
             conflictMessage: null,
           });
 
+          console.log(`[workoutStore] ✅ Save successful (version ${state.stateVersion} → ${result.version})`);
           return result;
         } catch (error) {
           if (error instanceof ConflictError) {
-            // Version conflict detected - mark state as stale
-            set({
-              isStale: true,
-              conflictMessage: error.message,
-            });
-            console.error('[workoutStore] ⚠️ Version conflict:', error.message);
+            if (retries > 0) {
+              // AUTOMATIC RETRY: Fetch fresh version and try again
+              console.warn(`[workoutStore] ⚠️ Version conflict detected, retrying... (${retries} attempts left)`);
+
+              try {
+                // Load fresh version from API
+                await get().loadFromAPI();
+
+                // Retry save with updated version
+                return await get()._saveWithVersion(stateToSave, retries - 1);
+              } catch (retryError) {
+                console.error('[workoutStore] ❌ Retry failed:', retryError);
+                throw retryError;
+              }
+            } else {
+              // Out of retries - mark state as stale and show conflict modal
+              set({
+                isStale: true,
+                conflictMessage: error.message,
+              });
+              console.error('[workoutStore] ❌ Version conflict - out of retries:', error.message);
+            }
           }
           throw error;
         }
@@ -202,7 +243,7 @@ const useWorkoutStore = create((set, get) => ({
        * Update active session (e.g., add/update sets)
        * API-FIRST: Saves to DynamoDB before updating local state
        */
-      updateActiveSession: async (updates) => {
+      updateActiveSession: (updates) => {
         const { activeSession, isOnline } = get();
 
         if (!activeSession) {
@@ -215,21 +256,29 @@ const useWorkoutStore = create((set, get) => ({
         // OPTIMISTIC UPDATE: Update local state immediately for instant UI feedback
         set({ activeSession: updatedSession });
 
-        // Sync to API in background (non-blocking)
+        // DEBOUNCED SYNC: Batch rapid updates into a single API call
+        // Clear any existing timer (user is still making changes)
+        if (syncDebounceTimer) {
+          clearTimeout(syncDebounceTimer);
+        }
+
+        // Start new timer - only save after user stops making changes for 1.5 seconds
         if (isOnline) {
-          try {
-            const state = get();
-            await state._saveWithVersion({
-              sessions: state.sessions,
-              customExercises: state.customExercises,
-              customTemplates: state.customTemplates,
-              activeSession: updatedSession,
-            });
-            console.log('[workoutStore] Active session synced to DynamoDB');
-          } catch (error) {
-            console.error('[workoutStore] Background sync failed:', error);
-            // Could implement retry logic or rollback here if needed
-          }
+          syncDebounceTimer = setTimeout(async () => {
+            try {
+              const state = get();
+              await state._saveWithVersion({
+                sessions: state.sessions,
+                customExercises: state.customExercises,
+                customTemplates: state.customTemplates,
+                activeSession: state.activeSession, // Use latest from state
+              });
+              console.log('[workoutStore] ✅ Active session synced to DynamoDB (debounced)');
+            } catch (error) {
+              console.error('[workoutStore] ❌ Background sync failed:', error);
+              // Retry logic is handled in _saveWithVersion
+            }
+          }, SYNC_DEBOUNCE_MS);
         }
 
         return updatedSession;
@@ -819,6 +868,48 @@ const useWorkoutStore = create((set, get) => ({
       },
 
       /**
+       * Update user profile (age + free-text training goal)
+       * Sent to AI coach lambda for personalized recommendations.
+       */
+      setUserProfile: async ({ age, trainingGoal }) => {
+        const { isOnline } = get();
+
+        if (!isOnline) {
+          throw new Error('Cannot update profile while offline');
+        }
+
+        const validAge = Math.max(0, Math.min(120, parseInt(age, 10) || 0));
+        const validGoal = (trainingGoal || '').trim().slice(0, 1000);
+
+        set({ isLoading: true });
+
+        try {
+          const state = get();
+          await state._saveWithVersion({
+            sessions: state.sessions,
+            customExercises: state.customExercises,
+            customTemplates: state.customTemplates,
+            activeSession: state.activeSession,
+            bodyMeasurements: state.bodyMeasurements,
+            restTimerDuration: state.restTimerDuration,
+            deloadMode: state.deloadMode,
+            deloadRepsOnlyPercentage: state.deloadRepsOnlyPercentage,
+            deloadWeightedRepsPercentage: state.deloadWeightedRepsPercentage,
+            deloadWeightPercentage: state.deloadWeightPercentage,
+            age: validAge,
+            trainingGoal: validGoal,
+          });
+
+          set({ age: validAge, trainingGoal: validGoal, isLoading: false });
+          return { age: validAge, trainingGoal: validGoal };
+        } catch (error) {
+          set({ isLoading: false });
+          console.error('[workoutStore] Failed to update user profile:', error);
+          throw error;
+        }
+      },
+
+      /**
        * Get deload settings
        */
       getDeloadSettings: () => {
@@ -870,6 +961,10 @@ const useWorkoutStore = create((set, get) => ({
               deloadRepsOnlyPercentage: data.deloadRepsOnlyPercentage || 100,
               deloadWeightedRepsPercentage: data.deloadWeightedRepsPercentage || 100,
               deloadWeightPercentage: data.deloadWeightPercentage || 100,
+              age: data.age || 0,
+              trainingGoal: data.trainingGoal || '',
+              dailyInsights: data.dailyInsights || null,
+              lastAnalyzed: data.lastAnalyzed || null,
               stateVersion: data.version || 1,
               lastModified: data.lastModified || null,
               isStale: false,
@@ -883,6 +978,8 @@ const useWorkoutStore = create((set, get) => ({
               customExercises: (data.customExercises || []).length,
               customTemplates: (data.customTemplates || []).length,
               bodyMeasurements: (data.bodyMeasurements || []).length,
+              dailyInsights: data.dailyInsights ? 'present' : 'none',
+              lastAnalyzed: data.lastAnalyzed || 'never',
             });
             return { success: true };
           } else {
@@ -898,6 +995,8 @@ const useWorkoutStore = create((set, get) => ({
               deloadRepsOnlyPercentage: 100,
               deloadWeightedRepsPercentage: 100,
               deloadWeightPercentage: 100,
+              age: 0,
+              trainingGoal: '',
               stateVersion: 1,
               lastModified: null,
               isStale: false,

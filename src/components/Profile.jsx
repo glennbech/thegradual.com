@@ -1,4 +1,4 @@
-import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download, FileText, Timer, Zap } from 'lucide-react';
+import { User, Mail, Shield, Database, Cloud, HardDrive, LogOut, Settings, Download, FileText, Timer, Zap, Target } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { awsConfig } from '../config/aws';
@@ -25,6 +25,11 @@ export default function Profile() {
   const deloadWeightPercentage = useWorkoutStore((state) => state.deloadWeightPercentage);
   const setDeloadSettings = useWorkoutStore((state) => state.setDeloadSettings);
 
+  // User profile (sent to AI coach for personalized recommendations)
+  const age = useWorkoutStore((state) => state.age);
+  const trainingGoal = useWorkoutStore((state) => state.trainingGoal);
+  const setUserProfile = useWorkoutStore((state) => state.setUserProfile);
+
   // Local state for rest timer
   const [localRestTimer, setLocalRestTimer] = useState(restTimerDuration);
   const [isSavingTimer, setIsSavingTimer] = useState(false);
@@ -35,6 +40,11 @@ export default function Profile() {
   const [localWeightedRepsPct, setLocalWeightedRepsPct] = useState(deloadWeightedRepsPercentage);
   const [localWeightPct, setLocalWeightPct] = useState(deloadWeightPercentage);
   const [isSavingDeload, setIsSavingDeload] = useState(false);
+
+  // Local state for user profile
+  const [localAge, setLocalAge] = useState(age ? String(age) : '');
+  const [localTrainingGoal, setLocalTrainingGoal] = useState(trainingGoal || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Sync local state with Zustand store (when store updates from API)
   useEffect(() => {
@@ -56,6 +66,14 @@ export default function Profile() {
   useEffect(() => {
     setLocalWeightPct(deloadWeightPercentage);
   }, [deloadWeightPercentage]);
+
+  useEffect(() => {
+    setLocalAge(age ? String(age) : '');
+  }, [age]);
+
+  useEffect(() => {
+    setLocalTrainingGoal(trainingGoal || '');
+  }, [trainingGoal]);
 
   // Get localStorage stats for debug
   const getLocalStorageStats = () => {
@@ -179,6 +197,25 @@ export default function Profile() {
     localRepsOnlyPct !== deloadRepsOnlyPercentage ||
     localWeightedRepsPct !== deloadWeightedRepsPercentage ||
     localWeightPct !== deloadWeightPercentage;
+
+  // Save user profile (age + training goal)
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      await setUserProfile({
+        age: localAge ? parseInt(localAge, 10) : 0,
+        trainingGoal: localTrainingGoal,
+      });
+    } catch (error) {
+      console.error('Failed to save user profile:', error);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const profileChanged =
+    (parseInt(localAge, 10) || 0) !== (age || 0) ||
+    (localTrainingGoal || '').trim() !== (trainingGoal || '').trim();
 
   if (!isAuthenticated) {
     // Anonymous user view
@@ -323,6 +360,69 @@ export default function Profile() {
             <p className="text-xs text-mono-600">
               Your workout data is automatically synced to the cloud. You can access it from any device by signing in.
             </p>
+          </div>
+        </div>
+
+        {/* Personal Info — sent to AI coach for personalized recommendations */}
+        <div className="bg-white rounded-lg p-6 border border-mono-200">
+          <h2 className="text-lg font-bold text-mono-900 mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5 text-[#A855F7]" strokeWidth={2} />
+            Personal Info
+          </h2>
+          <p className="text-xs text-mono-600 mb-4">
+            Shared with the AI coach to personalize insights and recommendations.
+          </p>
+
+          <div className="space-y-4">
+            {/* Age */}
+            <div>
+              <label htmlFor="profile-age" className="block text-sm font-semibold text-mono-900 mb-2">
+                Age
+              </label>
+              <input
+                id="profile-age"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                max="120"
+                placeholder="e.g. 35"
+                value={localAge}
+                onChange={(e) => setLocalAge(e.target.value)}
+                className="w-full px-4 py-3 bg-white border-2 border-mono-200 rounded-lg text-mono-900 focus:outline-none focus:border-[#A855F7] transition-colors"
+              />
+            </div>
+
+            {/* Training Goal */}
+            <div>
+              <label htmlFor="profile-goal" className="block text-sm font-semibold text-mono-900 mb-2">
+                Training Goal
+              </label>
+              <textarea
+                id="profile-goal"
+                rows={4}
+                maxLength={1000}
+                placeholder="e.g. Build muscle while losing fat. Focus on upper body strength. Train 4 days/week."
+                value={localTrainingGoal}
+                onChange={(e) => setLocalTrainingGoal(e.target.value)}
+                className="w-full px-4 py-3 bg-white border-2 border-mono-200 rounded-lg text-mono-900 focus:outline-none focus:border-[#A855F7] transition-colors resize-none"
+              />
+              <div className="text-xs text-mono-500 mt-1 text-right">
+                {localTrainingGoal.length}/1000
+              </div>
+            </div>
+
+            {/* Save Button */}
+            {profileChanged && (
+              <motion.button
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile}
+                className="w-full px-6 py-3 bg-[#A855F7] hover:bg-[#9333EA] text-white rounded-lg transition-colors font-semibold uppercase tracking-wide text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingProfile ? 'Saving...' : 'Save Profile'}
+              </motion.button>
+            )}
           </div>
         </div>
 

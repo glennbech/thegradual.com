@@ -27,7 +27,8 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
     maxDuration: session.maxDuration,
     totalDuration: session.totalDuration,
     sets: session.sets,
-    sessionId: session.sessionId // Add session ID for navigation
+    sessionId: session.sessionId, // Add session ID for navigation
+    isDeload: session.isDeload || false // Add deload flag
   }));
 
   // Calculate Y-axis domain for better visualization
@@ -63,6 +64,30 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
 
   const muscleColor = getMuscleColor(exercise.muscleGroup || exercise.category?.toLowerCase() || 'core');
 
+  // Custom dot renderer - gray for deload sessions
+  const CustomDot = (props) => {
+    const { cx, cy, payload, onClick } = props;
+    const isDeload = payload.isDeload;
+    const dotColor = isDeload ? '#9CA3AF' : muscleColor;
+
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={5}
+        fill={dotColor}
+        stroke="#fff"
+        strokeWidth={2}
+        style={{ cursor: 'pointer' }}
+        onClick={() => {
+          if (payload && payload.sessionId) {
+            onClick && onClick(payload);
+          }
+        }}
+      />
+    );
+  };
+
   // Custom tooltip for charts - adapt to exercise type
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -89,6 +114,9 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
             );
           })}
           <p className="text-xs text-mono-500 mt-1">{data.sets} sets</p>
+          {data.isDeload && (
+            <p className="text-xs text-[#9CA3AF] font-bold uppercase mt-1">Deload Session</p>
+          )}
           <p className="text-xs text-mono-500 mt-2 italic border-t border-mono-200 pt-2">
             Click to view session
           </p>
@@ -269,20 +297,13 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                           name={exerciseType === 'time-based' ? 'Max Duration (s)' :
                                 exerciseType === 'reps-only' ? 'Max Reps' :
                                 'Max Weight (kg)'}
-                          dot={{
-                            fill: muscleColor,
-                            r: 5,
-                            strokeWidth: 2,
-                            stroke: '#fff',
-                            cursor: 'pointer',
-                            onClick: (data) => {
-                              if (data && data.sessionId) {
-                                console.log('[ExerciseProgressDetail] Clicked data point:', data);
-                                onSessionClick(data.sessionId);
-                                onClose();
-                              }
+                          dot={<CustomDot onClick={(data) => {
+                            if (data && data.sessionId) {
+                              console.log('[ExerciseProgressDetail] Clicked data point:', data);
+                              onSessionClick(data.sessionId);
+                              onClose();
                             }
-                          }}
+                          }} />}
                           activeDot={{
                             r: 7,
                             cursor: 'pointer',
@@ -355,20 +376,13 @@ export default function ExerciseProgressDetail({ exercise, stats, isOpen, onClos
                           name={exerciseType === 'time-based' ? 'Total Duration (s)' :
                                 exerciseType === 'reps-only' ? 'Total Reps' :
                                 'Volume (kg)'}
-                          dot={{
-                            fill: muscleColor,
-                            r: 5,
-                            strokeWidth: 2,
-                            stroke: '#fff',
-                            cursor: 'pointer',
-                            onClick: (data) => {
-                              if (data && data.sessionId) {
-                                console.log('[ExerciseProgressDetail] Clicked data point:', data);
-                                onSessionClick(data.sessionId);
-                                onClose();
-                              }
+                          dot={<CustomDot onClick={(data) => {
+                            if (data && data.sessionId) {
+                              console.log('[ExerciseProgressDetail] Clicked data point:', data);
+                              onSessionClick(data.sessionId);
+                              onClose();
                             }
-                          }}
+                          }} />}
                           activeDot={{
                             r: 7,
                             cursor: 'pointer',
